@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Organization, Pallet, Package
+from .models import Organization, Pallet, Package, BlockchainTransaction
 
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,3 +18,11 @@ class PalletSerializer(serializers.ModelSerializer):
             'status', 'vet_approval', 'is_quality_maintained', 
             'departure_date', 'created_at'
         ]
+
+# Blockchain loglarini gostermek icin kullanilan serializer tanimidir.
+class BlockchainTransactionSerializer(serializers.ModelSerializer):
+    action_type_display = serializers.CharField(source="get_action_type_display", read_only=True)
+
+    class Meta:
+        model = BlockchainTransaction
+        fields = ["action_type", "action_type_display", "tx_hash", "status", "payload", "timestamp"]
