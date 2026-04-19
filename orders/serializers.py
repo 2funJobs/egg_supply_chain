@@ -26,3 +26,10 @@ class BlockchainTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = BlockchainTransaction
         fields = ["action_type", "action_type_display", "tx_hash", "status", "payload", "timestamp"]
+
+class PackageSerializer(serializers.ModelSerializer):
+    pallet_detail = PalletSerializer(source="pallet", read_only=True)
+    class Meta:
+        model = Package
+        fields = ["package_qr_id", "pallet_detail", "feeding_type", "laying_date", "expiry_date"]
+    

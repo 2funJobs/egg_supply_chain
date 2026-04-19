@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from .models import Organization, Pallet
-from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer
+from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer, PackageSerializer
 from .services import log_to_blockchain
 
 class OrganizationViewSet(viewsets.ModelViewSet):
@@ -91,3 +91,4 @@ class PalletViewSet(viewsets.ModelViewSet):
             "product_info": pallet_data,
             "timeline": transaction_data
         })
+

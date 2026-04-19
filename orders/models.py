@@ -67,11 +67,17 @@ class Pallet(models.Model):
 
 # 4. Paket Varlığı (Unit QR / Tüketici Birimi)
 class Package(models.Model):
-    package_qr_id = models.CharField(max_length=100, unique=True, db_index=True, verbose_name="Package QR")
+    FEEDING_TYPE= [
+        ('0', "Organik"),
+        ('1', 'Gezen Tavuk'),
+        ('2', 'Kümes'),
+        ('3', 'Kafes')
+    ]
+    package_qr_id = models.CharField(max_length=100, unique=True, db_index=True, verbose_name="Paket QR")
     pallet = models.ForeignKey(Pallet, on_delete=models.CASCADE, related_name="packages", verbose_name="Related Pallet")
-
-    laying_date = models.DateField(verbose_name="Laying Date")
-    expiry_date = models.DateField(verbose_name="Best Before")
+    feeding_type = models.CharField(max_length=20, choices=FEEDING_TYPE, default="Kümes", verbose_name="Beslenme Türü")
+    laying_date = models.DateField(verbose_name="Yumurtlama Tarihi")
+    expiry_date = models.DateField(verbose_name="TETT")
 
     def __str__(self):
         return f"Package: {self.package_qr_id}"
