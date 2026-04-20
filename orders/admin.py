@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Organization, Pallet, Package, BlockchainTransaction
+from .models import User, Organization, Pallet, Package, BlockchainTransaction, InspectionCertificate
 
 class CustomUserAdmin(UserAdmin):
     # Kullanici guncelleme
@@ -25,7 +25,7 @@ class CustomUserAdmin(UserAdmin):
 admin.site.register(User, CustomUserAdmin)
 
 @admin.register(Organization)
-class EntityAdmin(admin.ModelAdmin):
+class OrganizationAdmin(admin.ModelAdmin):
     list_display = ('name', 'organization_type', 'location')
     list_filter = ('organization_type',)
     search_fields = ('name',)
@@ -46,3 +46,7 @@ class BlockchainTransactionAdmin(admin.ModelAdmin):
     list_display = ('tx_hash', 'action_type', 'pallet', 'status', 'timestamp')
     list_filter = ('action_type', 'status')
     search_fields = ('tx_hash', 'pallet_master_qr_id')
+
+@admin.register(InspectionCertificate)
+class InspectionCertificateAdmin(admin.ModelAdmin):
+    list_display = ('inspector', 'producer')

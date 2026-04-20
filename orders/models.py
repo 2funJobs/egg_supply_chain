@@ -3,7 +3,6 @@ from django.contrib.auth.models import AbstractUser
 import uuid
 
 # 1_Organization Table
-
 class Organization(models.Model):
     # Uretici, Dagitici ve Martketi ayri tablolar yerine ayri niteliklere ayrilmasi
     ORGANIZATION_CHOICES = [
@@ -27,7 +26,6 @@ class Organization(models.Model):
         verbose_name_plural = "Organizations"
 
 # 2_User Table
-
 class User(AbstractUser):
     ROLE_CHOICES = [
         ('ADMIN', 'System Manager'),
@@ -62,7 +60,6 @@ class Pallet(models.Model):
 # Güvenlik ve Kalite Metrikleri
     vet_approval = models.BooleanField(default=False, verbose_name="Vet Approval")
     is_quality_maintained = models.BooleanField(default=True, verbose_name="Quality/Temperature Ensured?")
-
     departure_date = models.DateTimeField(null=True, blank=True, verbose_name="Departure Date")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -86,6 +83,28 @@ class Package(models.Model):
     def __str__(self):
         return f"Package: {self.package_qr_id}"
     
+class InspectionCertificate(models.Model):
+    inspector = models.ForeignKey(
+        Organization, 
+        limit_choices_to={'organization_type': 'INSPECTOR'}, 
+        on_delete=models.CASCADE,
+        related_name='given_certificates'  # Verdiği sertifikalar
+    )
+    
+    producer = models.ForeignKey(
+        Organization, 
+        limit_choices_to={'organization_type': 'PRODUCER'}, 
+        on_delete=models.CASCADE,
+        related_name='received_certificates' # Aldığı sertifikalar
+    )
+
+    valid_from = models.DateTimeField()
+    valid_to = models.DateTimeField()
+    certificate_no = models.CharField(max_length=50, unique=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Sertifika: {self.certificate_no} - {self.producer.name}"
 
 class BlockchainTransaction(models.Model):
 
@@ -94,6 +113,7 @@ class BlockchainTransaction(models.Model):
         ('TRAN', 'Transfer/Logistics'),
         ('QUAL', 'Quality Control'),
         ('RECV', 'Market Received'),
+        ('CERT', 'Certification/Approval')
     ]
 
     STATUS_CHOICES = [
@@ -102,15 +122,19 @@ class BlockchainTransaction(models.Model):
         ('FAILED', 'Failed'),
     ]
 
-    pallet = models.ForeignKey(Pallet, on_delete=models.CASCADE, related_name='transactions', verbose_name="Pallet")
+    pallet = models.ForeignKey(Pallet, on_delete=models.CASCADE, null=True, blank=True, related_name='transactions', verbose_name="Pallet")
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="User")
-    
+    organization = models.ForeignKey('Organization', on_delete=models.SET_NULL, null=True, related_name='blockchain_logs', verbose_name="Organization")
     action_type = models.CharField(max_length=4, choices=ACTION_CHOICES, verbose_name="Action Type")
     
     # Ethereum/EVM tabanlı ağlarda hash genelde 66 karakterdir (0x + 64 karakter)
-    tx_hash = models.CharField(max_length=66, unique=True, db_index=True, verbose_name="Transaction Hash (TxID)")
+    # Uzunluk 100 yapıldı. null ve blank True yapıldı ki PENDING işlemler hata vermesin.
+    tx_hash = models.CharField(max_length=100, unique=True, db_index=True, null=True, blank=True, verbose_name="Transaction Hash (TxID)")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING', verbose_name="Status")
     
+    # Blokzincir ağındaki bloğun numarası (Ağdan Success yanıtı gelince doldurulur)
+    block_number = models.PositiveIntegerField(null=True, blank=True, verbose_name="Block Number")
+
     # Blokzincire giden verinin bir kopyası (PostgreSQL JSONField bu iş için mükemmeldir)
     payload = models.JSONField(help_text="Data brief that sended to blockchain", null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Time Stamp")
@@ -122,4 +146,5 @@ class BlockchainTransaction(models.Model):
 
     def __str__(self):
         # Admin panelinde çok uzun görünmemesi için hash'in ilk 10 karakterini gösteriyoruz
-        return f"{self.get_action_type_display()} - {self.tx_hash[:10]}..."
+        hash_display = self.tx_hash[:10] + "..." if self.tx_hash else "PENDING..."
+        return f"{self.get_action_type_display()} - {hash_display}"

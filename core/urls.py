@@ -18,16 +18,19 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from orders.views import OrganizationViewSet, PalletViewSet, PackageViewSet
+from orders.views import OrganizationViewSet, PalletViewSet, PackageViewSet, CertificateViewSet, BlockchainTransactionsViewSet
 
 # Uygulamadaki viewleri route etmek icin kullan
 from orders.views import OrganizationViewSet, PalletViewSet
 
 # Otomatik URL routing icin Router tanimlanir.
+# Uç noktaları (endpoints) kaydediyoruz
 router = DefaultRouter()
-router.register(r"organizations", OrganizationViewSet)
-router.register(r"pallets", PalletViewSet)
-router.register(r"packages", PackageViewSet)
+router.register(r'organizations', OrganizationViewSet, basename='organization')
+router.register(r'certificates', CertificateViewSet, basename='certificate')
+router.register(r'pallets', PalletViewSet, basename='pallet')
+router.register(r'packages', PackageViewSet, basename='package')
+router.register(r'blockchain-logs', BlockchainTransactionsViewSet, basename='blockchain-log')
 
 urlpatterns = [
     # Admin endpoints

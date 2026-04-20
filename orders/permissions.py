@@ -23,10 +23,11 @@ class IsVet(permissions.BasePermission):
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated and request.user.organization):
             return False
-            
+        
+        user = request.user
         # Hem kurum tipi INSPECTOR olmalı, hem de kişinin rolü VET olmalı
-        is_inspector_org = request.user.organization.organization_type == 'INSPECTOR'
-        is_vet_role = request.user.role == 'VET'
+        is_inspector_org = user.organization.organization_type == 'INSPECTOR'
+        is_vet_role = user.role in ['VET', 'STAFF']
         
         return is_inspector_org and is_vet_role
     

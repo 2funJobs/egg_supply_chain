@@ -1,19 +1,40 @@
 from django.shortcuts import render, get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
-
+from rest_framework import permissions
 from .permissions import IsProducer, IsVet, IsMarketOrLogisticsStaff
-from .models import Organization, Pallet, Package
-from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer, PackageSerializer
+from .models import Organization, Pallet, Package, InspectionCertificate, BlockchainTransaction
+from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer, PackageSerializer, CertificateSerializer
 from .services import log_to_blockchain
 
 class OrganizationViewSet(viewsets.ModelViewSet):
     # Kurumlari listeleyen ve olusturan API endpoint
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
+
+class CertificateViewSet(viewsets.ModelViewSet):
+    queryset = InspectionCertificate.objects.all()
+    serializer_class = CertificateSerializer
+    permission_classes = [IsVet] # Sadece INSPECTOR kurumundaki VET'ler
+    lookup_field = 'certificate_no'
+
+    def perform_create(self, serializer):
+        # 1. Sertifikayı veren kurumu ata ve veritabanına kaydet
+        certificate = serializer.save(inspector=self.request.user.organization)
+        
+        # 2. Blokzincir Logu (CERT)
+        payload = {
+            "certificate_no": certificate.certificate_no,
+            "producer_org_code": certificate.producer.org_code,
+            "valid_until": str(certificate.valid_to)
+        }
+        # Palet bazlı değil, genel bir işlem olduğu için pallet=None gönderiyoruz
+        log_to_blockchain(pallet=None, user=self.request.user, action_type='CERT', payload=payload)
 
 class PalletViewSet(viewsets.ModelViewSet):
     # Paletleri listeleyen, yeni palet olusturan API endpoint
@@ -23,31 +44,16 @@ class PalletViewSet(viewsets.ModelViewSet):
     lookup_field = "master_qr_id"
     
     def get_permissions(self):
+        if self.action == 'get_history':
+            permission_classes = [AllowAny]
     # Varsayılan olarak paletlere sadece giriş yapmış kullanıcılar erişsin
-        permission_classes = [IsAuthenticated]
     # Ancak yeni Palet YARATMA (POST) işlemini SADECE ÜRETİCİ yapabilsin
-        if self.action == 'create':
+        elif self.action == 'create':
             permission_classes = [IsProducer]
+        else:
+            permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
-    
-    # Veteriner Onayi(sadece veteriner token ile islem yapabilir)
-    @action(detail=True, methods=['post'], url_path="vet-approval", permission_classes=[IsVet])
-    def vet_approval(self, request, master_qr_id=None):
-        pallet = self.get_object() #URL deki IDden ilgili palet
-        # user = request.user
-        pallet.vet_approval = True
-        pallet.save()
 
-        # simdi blockzincir logu olusturalim.
-        payload_data = {
-            "is_approved": True,
-            "vet_notes": request.data.get("notes", "Sorunsuz") 
-        }
-
-        # Kalite Kontrolu
-        log = log_to_blockchain(pallet, user, "QLTY", payload_data)
-        return Response({"message": "Veteriner onayi basarili", "txid": log.tx_hash})
-    
 # Lojistik islemler icin gerekli action
     @action(detail=True, methods=["patch"], url_path="transfer", permission_classes=[IsMarketOrLogisticsStaff])
     def transfer(self, request, master_qr_id=None):
@@ -82,18 +88,22 @@ class PalletViewSet(viewsets.ModelViewSet):
         }
 
     # log_to_blockchain servisine verileri gönderiyoruz.
-    # İşlem tipi olarak 'TRAN' (Transfer/Lojistik) kodunu kullanıyoruz.
+        dynamic_action_type = 'RECV' if new_holder.organization_type == 'MARKET' else 'TRAN'
+    # İşlem tipi olarak market ya da lojistik olma durumuna göre 
+    # 'TRAN' (Transfer/Lojistik) yada RECV kodunu kullanıyoruz.
         log = log_to_blockchain(
             pallet=pallet, 
             user=request.user, # İşlemi yapan şoför/market yetkilisi
-            action_type='TRAN', 
+            action_type=dynamic_action_type, 
             payload=payload_data
         )
 
         # 4. İstemciye (Mobil Uygulamaya) Başarı Yanıtı ve Makbuz (TxID) Dön
+       # 4. İstemciye (Mobil Uygulamaya) Başarı Yanıtı ve Takip Numarası Dön
         return Response({
             "message": f"Palet mülkiyeti başarıyla {new_holder.name} kurumuna devredildi.",
-            "txid": log.tx_hash,
+            "tracking_id": log.id, # txid yerine yerel veritabanı ID'sini dönüyoruz
+            "status_info": "İşlem blokzincir kuyruğuna alındı.",
             "courier_verified": bool(courier_wallet),
             "new_status": pallet.status
         }, status=200)
@@ -113,7 +123,7 @@ class PalletViewSet(viewsets.ModelViewSet):
             pallet.save()
 
             payload = {"alert": "Sıcaklık sınırı aşıldı!", "temp": temp, "humidity":humidity}
-            log_to_blockchain(pallet, request.user, "QLTY", payload)
+            log_to_blockchain(pallet, request.user, "QUAL", payload)
 
             return Response({
                 "status": "CRITICAL",
@@ -142,11 +152,40 @@ class PalletViewSet(viewsets.ModelViewSet):
 
     # POST işlemi sırasında araya girip üreticiyi ve ilk sahibini otomatik atıyoruz
     def perform_create(self, serializer):
-        # İşlemi yapan kullanıcının bağlı olduğu kurumu bul
         organization = self.request.user.organization
-        
-        # Paleti oluştururken üreticiyi ve mevcut sahibini bu kurum olarak zorla kaydet
-        serializer.save(producer=organization, current_holder=organization)
+        now = timezone.now()
+
+        # 1. GÜVENLİK DUVARI: Çiftliğin aktif bir sertifikası var mı?
+        # valid_from bugünden küçük/eşit olmalı, valid_to bugünden büyük/eşit olmalı
+        active_certificate = InspectionCertificate.objects.filter(
+            producer=organization,
+            is_active=True,
+            valid_from__lte=now,
+            valid_to__gte=now
+        ).first()
+
+        # Eğer aktif sertifika yoksa, hacker postman'den istek atsa bile reddet!
+        if not active_certificate:
+            raise PermissionDenied(
+                "Üretim durduruldu: Çiftliğinize ait geçerli bir veteriner denetim sertifikası bulunamadı."
+            )
+
+        # 2. HER ŞEY YOLUNDA: Paleti otomatik 'Onaylı' olarak kaydet
+        pallet = serializer.save(
+            producer=organization, 
+            current_holder=organization,
+            vet_approval=True # Veteriner tek tek onaylamaz, sertifika olduğu için otomatik True olur!
+        )
+
+        # 3. BLOKZİNCİR LOGU (Opsiyonel ama mükemmel olur)
+        # Paletin hangi sertifika numarasına dayanarak üretildiğini blokzincire kazıyoruz.
+        payload_data = {
+            "action": "PALLET_CREATED",
+            "auto_vet_approval": True,
+            "certificate_no": active_certificate.certificate_no,
+            "inspector_org": active_certificate.inspector.name
+        }
+        log_to_blockchain(pallet, self.request.user, "PROD", payload_data)
 
 class PackageViewSet(viewsets.ModelViewSet):
     queryset = Package.objects.all()
@@ -185,3 +224,21 @@ class PackageViewSet(viewsets.ModelViewSet):
         
         # 4. Her şey yolundaysa paketi kaydet (Package modelinde ekstra alan olmadığı için içi boş save yeterli)
         serializer.save()
+
+class BlockchainTransactionsViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = BlockchainTransaction.objects.all()
+    serializer_class = BlockchainTransactionSerializer
+    
+    # 1. WEB3 STANDARDI: Detay aramalarında ID yerine Hash kullanılır
+    lookup_field = 'tx_hash'
+
+    # 2. FRONTEND'İN HAYAT KURTARICISI: Filtreleme Mekanizması
+    filter_backends = [DjangoFilterBackend]
+    
+    # Frontend'in URL sonuna soru işareti (?) ile parametre ekleyebileceği alanlar
+    filterset_fields = [
+        'pallet__master_qr_id',  # Örn: ?pallet__master_qr_id=PAL-123
+        'organization__org_code',# Örn: ?organization__org_code=ORG-A101
+        'status',                # Örn: ?status=PENDING
+        'action_type'            # Örn: ?action_type=TRAN
+    ]
