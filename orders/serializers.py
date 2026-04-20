@@ -4,7 +4,7 @@ from .models import Organization, Pallet, Package, BlockchainTransaction
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
-        fields = ["id", "name", "organization_type", "location"]
+        fields = ["org_code", "name", "organization_type", "location"]
 
 class PalletSerializer(serializers.ModelSerializer):
     producer_detail = OrganizationSerializer(source="producer", read_only=True)
@@ -18,6 +18,9 @@ class PalletSerializer(serializers.ModelSerializer):
             'status', 'vet_approval', 'is_quality_maintained', 
             'departure_date', 'created_at'
         ]
+        
+        # Bu alanları read_only yaparsak, DRF artık POST isteğinde bu verileri kullanıcıdan beklemez.
+        read_only_fields = ['producer', 'current_holder', 'status', 'vet_approval', 'is_quality_maintained']
 
 # Blockchain loglarini gostermek icin kullanilan serializer tanimidir.
 class BlockchainTransactionSerializer(serializers.ModelSerializer):

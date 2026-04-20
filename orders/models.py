@@ -10,8 +10,10 @@ class Organization(models.Model):
         ('PRODUCER', 'Producer Farm'),
         ('DISTRIBUTOR', 'Distributor Firm'),
         ('MARKET', 'Retail Market'),
+        ('INSPECTOR', 'Inspection & Veterinary Agency')
     ]
 
+    org_code = models.CharField(max_length=50, unique=True, db_index=True, verbose_name="Kurum Kodu (Public ID)")
     name = models.CharField(max_length=200, verbose_name="Organization Name")
     organization_type = models.CharField(max_length=20, choices=ORGANIZATION_CHOICES, verbose_name="Organization Type")
     location = models.CharField(max_length=255, verbose_name="Address")
@@ -29,18 +31,18 @@ class Organization(models.Model):
 class User(AbstractUser):
     ROLE_CHOICES = [
         ('ADMIN', 'System Manager'),
-        ('FARMER', 'Farmer'),
-        ('CLERK', 'Clerk'),
-        ('DISTRIBUTOR', 'Distributor'),
-        ('VET', 'Veterinary')
+        ('ORG_ADMIN', 'Organization Manager'),
+        ('STAFF', 'Staff'),
+        ('VET', 'Veterinary'),
     ]
 
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='STAFF', verbose_name="User Role")
-    organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True, blank=True, related_name='users', verbose_name="Related Organization")
-    wallet_address = models.CharField(max_length=42, blank=True, null=True, verbose_name="Crypto Wallet Address")
+    organization = models.ForeignKey('Organization', on_delete=models.SET_NULL, null=True, blank=True, related_name='users', verbose_name="Related Organization")
+    wallet_address = models.CharField(max_length=42, unique=True, blank=True, null=True, verbose_name="Crypto Wallet Address")
 
     def __str__(self):
-        return f"{self.username} - {self.get_role_display()}"
+        org_name = self.organization.name if self.organization else "Bağımsız / Kurumsuz"
+        return f"{self.username} ({self.get_role_display()}) - {org_name}"
     
 # 3.Pallet Table
 class Pallet(models.Model):

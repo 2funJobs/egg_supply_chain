@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 
-from .permissions import IsProducer, IsVet, IsLogistics
+from .permissions import IsProducer, IsVet, IsMarketOrLogisticsStaff
 from .models import Organization, Pallet, Package
 from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer, PackageSerializer
 from .services import log_to_blockchain
@@ -31,7 +31,7 @@ class PalletViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
     
     # Veteriner Onayi(sadece veteriner token ile islem yapabilir)
-    @action(detail=True, methods=['post'], url_path="vet-approval", permission_classes="[IsVet]")
+    @action(detail=True, methods=['post'], url_path="vet-approval", permission_classes=[IsVet])
     def vet_approval(self, request, master_qr_id=None):
         pallet = self.get_object() #URL deki IDden ilgili palet
         # user = request.user
@@ -49,19 +49,20 @@ class PalletViewSet(viewsets.ModelViewSet):
         return Response({"message": "Veteriner onayi basarili", "txid": log.tx_hash})
     
 # Lojistik islemler icin gerekli action
-    @action(detail=True, methods=["patch"], url_path="transfer", permission_classes=[IsLogistics])
+    @action(detail=True, methods=["patch"], url_path="transfer", permission_classes=[IsMarketOrLogisticsStaff])
     def transfer(self, request, master_qr_id=None):
         pallet = self.get_object()
 
         # Lojistik calisani yeni urunleri aliyor
-        new_holder_id = request.data.get("new_holder_id")
+        new_holder_code = request.data.get("new_holder_code")
         new_status = request.data.get("status")
 
         #eksik veri olmasi durumunda
-        if not new_holder_id or not new_status:
-            return Response({"error": "new_holder_id ve status alanlari eksik"}, status=400)
+        if not new_holder_code or not new_status:
+            return Response({"error": "new_holder_code ve status alanlari eksik"}, status=400)
         # 3. Yeni sahibin (kurumun) veritabanında gerçekten var olup olmadığını kontrol et
-        new_holder = get_object_or_404(Entity, id=new_holder_id)
+        new_holder = get_object_or_404(Organization, org_code=new_holder_code)
+        courier_wallet = request.user.wallet_address
 
         # Log için eski sahibin adını kenara not alalım
         old_holder_name = pallet.current_holder.name if pallet.current_holder else "Bilinmiyor"
@@ -73,9 +74,10 @@ class PalletViewSet(viewsets.ModelViewSet):
 
     # --- ADIM B: BLOKZİNCİR GÜNCELLEMESİ (DUAL WRITE) ---
         payload_data = {
-            "transfer_from": old_holder_name,
-            "transfer_to": new_holder.name,
+            "transfer_from_org": old_holder_name,
+            "transfer_to_org_code": new_holder.org_code,
             "new_status": new_status,
+            "timestamp": "otomatik eklenecek",
             "notes": request.data.get("notes", "Transfer standart prosedürlere uygun gerçekleşti.")
         }
 
@@ -92,6 +94,7 @@ class PalletViewSet(viewsets.ModelViewSet):
         return Response({
             "message": f"Palet mülkiyeti başarıyla {new_holder.name} kurumuna devredildi.",
             "txid": log.tx_hash,
+            "courier_verified": bool(courier_wallet),
             "new_status": pallet.status
         }, status=200)
 
