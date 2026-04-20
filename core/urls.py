@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from orders.views import OrganizationViewSet, PalletViewSet
+from orders.views import OrganizationViewSet, PalletViewSet, PackageViewSet
 
 # Uygulamadaki viewleri route etmek icin kullan
 from orders.views import OrganizationViewSet, PalletViewSet
@@ -27,6 +27,7 @@ from orders.views import OrganizationViewSet, PalletViewSet
 router = DefaultRouter()
 router.register(r"organizations", OrganizationViewSet)
 router.register(r"pallets", PalletViewSet)
+router.register(r"packages", PackageViewSet)
 
 urlpatterns = [
     # Admin endpoints

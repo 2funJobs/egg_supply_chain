@@ -29,11 +29,13 @@ class Organization(models.Model):
 class User(AbstractUser):
     ROLE_CHOICES = [
         ('ADMIN', 'System Manager'),
-        ('STAFF', 'Organization Employee'),
+        ('FARMER', 'Farmer'),
+        ('CLERK', 'Clerk'),
+        ('DISTRIBUTOR', 'Distributor'),
         ('VET', 'Veterinary')
     ]
 
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='STAFF', verbose_name="User Role")
+    role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='STAFF', verbose_name="User Role")
     organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True, blank=True, related_name='users', verbose_name="Related Organization")
     wallet_address = models.CharField(max_length=42, blank=True, null=True, verbose_name="Crypto Wallet Address")
 

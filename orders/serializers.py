@@ -28,8 +28,14 @@ class BlockchainTransactionSerializer(serializers.ModelSerializer):
         fields = ["action_type", "action_type_display", "tx_hash", "status", "payload", "timestamp"]
 
 class PackageSerializer(serializers.ModelSerializer):
+
+    pallet = serializers.SlugRelatedField(
+        slug_field='master_qr_id',
+        queryset=Pallet.objects.all()
+    )
+
     pallet_detail = PalletSerializer(source="pallet", read_only=True)
     class Meta:
         model = Package
-        fields = ["package_qr_id", "pallet_detail", "feeding_type", "laying_date", "expiry_date"]
+        fields = ["package_qr_id", "pallet", "pallet_detail", "feeding_type", "laying_date", "expiry_date"]
     
