@@ -71,7 +71,7 @@ class PackageSerializer(serializers.ModelSerializer):
     pallet_detail = PalletSerializer(source="pallet", read_only=True)
     class Meta:
         model = Package
-        fields = ["package_qr_id", "pallet", "pallet_detail", "feeding_type", "laying_date", "expiry_date"]
+        fields = ["package_qr_id", "pallet", "pallet_detail", "feeding_type", "laying_date", "expiry_date", "capacity"]
     
 
 class CertificateSerializer(serializers.ModelSerializer):

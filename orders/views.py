@@ -84,7 +84,7 @@ class PalletViewSet(viewsets.ModelViewSet):
 
         # Log için eski sahibin adını kenara not alalım
         old_holder_name = pallet.current_holder.name if pallet.current_holder else "Bilinmiyor"
-
+        transfer_date = timezone.now().isoformat()
     # --- ADIM A: POSTGRESQL GÜNCELLEMESİ ---
         pallet.current_holder = new_holder
         pallet.status = new_status
@@ -95,7 +95,7 @@ class PalletViewSet(viewsets.ModelViewSet):
             "transfer_from_org": old_holder_name,
             "transfer_to_org_code": new_holder.org_code,
             "new_status": new_status,
-            "timestamp": "otomatik eklenecek",
+            "timestamp": transfer_date,
             "notes": request.data.get("notes", "Transfer standart prosedürlere uygun gerçekleşti.")
         }
 
@@ -124,27 +124,43 @@ class PalletViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="iot-data")
     def receive_iot_data(self, request, master_qr_id=None):
         pallet = self.get_object()
+        
+        if pallet.status != 'IN_TRANSIT':
+            return Response({"error": "Sadece yoldaki paletler için sıcaklık işlenebilir."}, status=400)
+
         temp = request.data.get("temperature")
         humidity = request.data.get("humidity")
+        if (temp is None) or (humidity is None):
+            return Response({"error": "Taşıma kalite verisi eksik!"}, status=400)
 
-        #Dagitim araci sicaklik kontrolu
-        # 8 derecenin ustu risklidir.
-        if temp and float(temp) > 8.0:
+        try:
+            temp_val = float(temp)
+            humidity_val = float(humidity)
+        except ValueError:
+            return Response({"error": "Sıcaklık ve nem değerleri sayısal olmalıdır!"}, status=400)
+
+        # Kural Kontrolü
+        if (15 <= temp_val <= 26) and (70 <= humidity_val <= 85):
+           return Response({
+                "status": "OK",
+                "message": f"Veri alındı. (Sıcaklık: {temp_val}°C, Nem: {humidity_val}%) - Mevzuata Uygun."
+            })
+        else:
             pallet.is_quality_maintained = False
-            pallet.status = "SPOILED" # Durum sorunlu olarak guncellendi
+            pallet.status = "FAULTY"
             pallet.save()
 
-            payload = {"alert": "Sıcaklık sınırı aşıldı!", "temp": temp, "humidity":humidity}
+            # 3. DÜZELTME: Fazladan parantez kaldırıldı
+            alert_message = f"Uygunsuz taşıma koşulu! Sıcaklık: {temp_val}°C, Nem: {humidity_val}%"
+
+            # 2. DÜZELTME: Nem (humidity) verisi blokzincir kanıtına eklendi
+            payload = {"alert": alert_message, "temp": temp_val, "humidity": humidity_val}
             log_to_blockchain(pallet, request.user, "QUAL", payload)
 
             return Response({
                 "status": "CRITICAL",
-                "message": "Sıcaklık ihlali tespit edildi! Palet durumu güncellendi ve loglandı."
+                "message": alert_message
             }, status=400)
-        
-        # Eger her sey yolundaysa sadece veri alindi bilgisi verilir. Cunku surekli gelen sicaklik verisini
-        # Blockzinciri kaydetmek verimsiz olacaktir. yani sadece ihlaller bildiriliyor.
-        return Response({"status": "OK", "message": "Veri alindi, degerler normal."})
 
     # POST işlemi sırasında araya girip üreticiyi ve ilk sahibini otomatik atıyoruz
     def perform_create(self, serializer):
@@ -218,6 +234,16 @@ class PackageViewSet(viewsets.ModelViewSet):
             # Eğer başkasının paletine paket koymaya çalışıyorsa işlemi reddet!
             raise PermissionDenied("Güvenlik ihlali: Sadece kendi kurumunuza ait paletlere paket ekleyebilirsiniz.")
         
+        # Palet yola çıkmış mı?
+        # Eğer paletin güncel sahibi çiftçi değilse VEYA durumu "Üretimde" değilse işlemi reddet!
+        if target_pallet.current_holder != user_organization or target_pallet.status != 'IN_PRODUCTION':
+            raise PermissionDenied(
+                "Yola çıkmış veya teslim edilmiş bir palete yeni paket ekleyemezsiniz."
+            )
+
+        # Sertifikalı olduğunun kanıtı
+        # certificate = target_pallet.transactions.filter(action_type='CERT'.first().payload.get("certificate_no"))
+
         # İşlem Bütünlüğü: Eğer bu bloğun içinde herhangi bir hata (Exception) çıkarsa,
         # Django veritabanına yapılan kayıtları (save) otomatik olarak geri alır (Rollback).
         with transaction.atomic():
@@ -228,9 +254,12 @@ class PackageViewSet(viewsets.ModelViewSet):
                 "action": "PACKAGE_CREATED",
                 "package_qr": package.package_qr_id,
                 "pallet_qr": package.pallet.master_qr_id,
+                "quality_class": "A Sınıfı",
                 "feeding_type": package.get_feeding_type_display(),
                 "laying_date": str(package.laying_date),
-                "expiry_date": str(package.expiry_date)
+                "expiry_date": str(package.expiry_date),
+                "capacity": package.capacity,
+                # "certificate_ref": certificate
             }
             
             # Bu log, paketin bireysel kimlik kartı olur
@@ -250,19 +279,34 @@ class PackageViewSet(viewsets.ModelViewSet):
         target_pallet = package.pallet
         
         # 3. Paletin geçmişini (BlockchainTransaction) çek
-        # PalletViewSet'teki mantığın aynısını buraya kuruyoruz
-        pallet_data = PalletSerializer(target_pallet).data
-        transactions = target_pallet.transactions.all()
-        transaction_data = BlockchainTransactionSerializer(transactions, many=True).data
+        # 2. Paletin TÜM geçmişini çek
+        # timestamp değerinin geçmiçten geleceğe olması için "-" değeri konulmaz.
+        all_transactions = target_pallet.transactions.all().order_by('timestamp')
+        
+        # 3. FİLTRELEME (Gürültüyü Temizle)
+        filtered_transactions = []
+        for tx in all_transactions:
+            payload = tx.payload or {}
+            
+            # Eğer bu log bir "Paket Üretim" loguysa ve QR kodu BİZİM paketimizle EŞLEŞMİYORSA, bunu atla (continue).
+            if tx.action_type == 'PROD' and payload.get('package_qr') and payload.get('package_qr') != package.package_qr_id:
+                continue
+                
+            # Geriye kalan her şeyi (Genel palet hareketleri ve bizim paketimizin logu) listeye ekle
+            filtered_transactions.append(tx)
+
+        # 4. Temizlenmiş listeyi Serializer'a ver
+        # pallet_data = PalletSerializer(target_pallet).data
+        transaction_data = BlockchainTransactionSerializer(filtered_transactions, many=True).data
 
         return Response({
-            "package_details": PackageSerializer(package).data,
-            "traceability_summary": {
-            "origin_pallet": target_pallet.master_qr_id,
-            "status": target_pallet.status,
-            "is_quality_maintained": target_pallet.is_quality_maintained
-        },
-        "timeline": transaction_data
+            # "package_details": PackageSerializer(package).data,
+            # "traceability_summary": {
+            #     "origin_pallet": target_pallet.master_qr_id,
+            #     "status": target_pallet.status,
+            #     "is_quality_maintained": target_pallet.is_quality_maintained
+            # },
+            "timeline": transaction_data
         })
 
 class BlockchainTransactionsViewSet(viewsets.ReadOnlyModelViewSet):

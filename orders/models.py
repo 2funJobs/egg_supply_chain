@@ -60,7 +60,7 @@ class Pallet(models.Model):
 # Güvenlik ve Kalite Metrikleri
     vet_approval = models.BooleanField(default=False, verbose_name="Vet Approval")
     is_quality_maintained = models.BooleanField(default=True, verbose_name="Quality/Temperature Ensured?")
-    departure_date = models.DateTimeField(null=True, blank=True, verbose_name="Departure Date")
+    departure_date = models.DateTimeField(null=True, blank=True, verbose_name="Çıkış Tarihi")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -69,16 +69,24 @@ class Pallet(models.Model):
 # 4. Paket Varlığı (Unit QR / Tüketici Birimi)
 class Package(models.Model):
     FEEDING_TYPE= [
-        ('0', "Organik"),
-        ('1', 'Gezen Tavuk'),
-        ('2', 'Kümes'),
-        ('3', 'Kafes')
+        (0, "Organik"),
+        (1, 'Gezen Tavuk'),
+        (2, 'Kümes'),
+        (3, 'Kafes')
     ]
+
+    CAPACITY = [
+        (6, "6'lı"),
+        (15, "15'li"),
+        (30, "30'lu")
+        ]
+
     package_qr_id = models.CharField(max_length=100, unique=True, db_index=True, verbose_name="Paket QR")
     pallet = models.ForeignKey(Pallet, on_delete=models.CASCADE, related_name="packages", verbose_name="Related Pallet")
-    feeding_type = models.CharField(max_length=20, choices=FEEDING_TYPE, default=2, verbose_name="Beslenme Türü")
+    feeding_type = models.IntegerField(choices=FEEDING_TYPE, default=2, verbose_name="Beslenme Türü")
     laying_date = models.DateField(verbose_name="Yumurtlama Tarihi")
     expiry_date = models.DateField(verbose_name="TETT")
+    capacity = models.IntegerField(choices=CAPACITY, default=30, verbose_name="Kapasite")
 
     def __str__(self):
         return f"Package: {self.package_qr_id}"
