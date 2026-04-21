@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
+from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -44,14 +45,25 @@ class PalletViewSet(viewsets.ModelViewSet):
     lookup_field = "master_qr_id"
     
     def get_permissions(self):
-        if self.action == 'get_history':
-            permission_classes = [AllowAny]
-    # Varsayılan olarak paletlere sadece giriş yapmış kullanıcılar erişsin
-    # Ancak yeni Palet YARATMA (POST) işlemini SADECE ÜRETİCİ yapabilsin
-        elif self.action == 'create':
+        """
+        PALETLER B2B (İŞLETMELER ARASI) BİRİMLERDİR. TÜKETİCİYE KAPALIDIR.
+        """
+        # 1. Yeni Palet Üretimi: Sadece Çiftçi (Üretici) yapabilir
+        if self.action == 'create':
             permission_classes = [IsProducer]
+            
+        # 2. Transfer ve IoT Verisi: Sadece Lojistik ve Market personeli yapabilir
+        elif self.action in ['transfer', 'receive_iot_data']:
+            permission_classes = [IsMarketOrLogisticsStaff]
+            
+        # 3. Güvenlik: Paletler manuel güncellenemez veya silinemez (Blokzincir bütünlüğü)
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [permissions.IsAdminUser] # Sadece sistem admini (Django Admin)
+            
+        # 4. Görüntüleme (Listeleme/Detay): Tüm sistem paydaşları okuyabilir
         else:
             permission_classes = [IsAuthenticated]
+            
         return [permission() for permission in permission_classes]
 
 # Lojistik islemler icin gerekli action
@@ -133,22 +145,6 @@ class PalletViewSet(viewsets.ModelViewSet):
         # Eger her sey yolundaysa sadece veri alindi bilgisi verilir. Cunku surekli gelen sicaklik verisini
         # Blockzinciri kaydetmek verimsiz olacaktir. yani sadece ihlaller bildiriliyor.
         return Response({"status": "OK", "message": "Veri alindi, degerler normal."})
-    
-    @action(detail=True, methods=["get"], url_path="history", permission_classes=[AllowAny])
-    # Allow any ile herkes authenticaion yani token ihtiycai olmdadan blockchain bilgisine erisebilir.
-    def get_history(self, request, master_qr_id=None):
-        # Paletin tum yasam dongusunun sunulacagi metod tanimidir.
-        pallet = self.get_object()
-
-        pallet_data = self.get_serializer(pallet).data
-
-        transactions = pallet.transactions.all()
-        transaction_data = BlockchainTransactionSerializer(transactions, many=True).data
-
-        return Response({
-            "product_info": pallet_data,
-            "timeline": transaction_data
-        })
 
     # POST işlemi sırasında araya girip üreticiyi ve ilk sahibini otomatik atıyoruz
     def perform_create(self, serializer):
@@ -199,7 +195,7 @@ class PackageViewSet(viewsets.ModelViewSet):
         - Üretici yaratır (IsProducer)
         - Kimse güncelleyemez (Güvenlik)
         """
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'get_history']:
             permission_classes = [AllowAny]
         elif self.action == 'create':
             permission_classes = [IsProducer] # YALNIZCA ÜRETİCİ YENİ PAKET GİREBİLİR
@@ -222,8 +218,52 @@ class PackageViewSet(viewsets.ModelViewSet):
             # Eğer başkasının paletine paket koymaya çalışıyorsa işlemi reddet!
             raise PermissionDenied("Güvenlik ihlali: Sadece kendi kurumunuza ait paletlere paket ekleyebilirsiniz.")
         
-        # 4. Her şey yolundaysa paketi kaydet (Package modelinde ekstra alan olmadığı için içi boş save yeterli)
-        serializer.save()
+        # İşlem Bütünlüğü: Eğer bu bloğun içinde herhangi bir hata (Exception) çıkarsa,
+        # Django veritabanına yapılan kayıtları (save) otomatik olarak geri alır (Rollback).
+        with transaction.atomic():
+            package = serializer.save()
+            
+            # 2. Paket bilgilerini blokzincire 'üretim kanıtı' olarak kazı
+            payload = {
+                "action": "PACKAGE_CREATED",
+                "package_qr": package.package_qr_id,
+                "pallet_qr": package.pallet.master_qr_id,
+                "feeding_type": package.get_feeding_type_display(),
+                "laying_date": str(package.laying_date),
+                "expiry_date": str(package.expiry_date)
+            }
+            
+            # Bu log, paketin bireysel kimlik kartı olur
+            log_to_blockchain(
+                pallet=package.pallet, 
+                user=self.request.user, 
+                action_type='PROD', 
+                payload=payload
+            )
+
+    @action(detail=True, methods=["get"], url_path="history", permission_classes=[AllowAny])
+    def get_history(self, request, package_qr_id=None):
+        # 1. Paketi bul
+        package = self.get_object()
+        
+        # 2. Paketin bağlı olduğu palete ulaş
+        target_pallet = package.pallet
+        
+        # 3. Paletin geçmişini (BlockchainTransaction) çek
+        # PalletViewSet'teki mantığın aynısını buraya kuruyoruz
+        pallet_data = PalletSerializer(target_pallet).data
+        transactions = target_pallet.transactions.all()
+        transaction_data = BlockchainTransactionSerializer(transactions, many=True).data
+
+        return Response({
+            "package_details": PackageSerializer(package).data,
+            "traceability_summary": {
+            "origin_pallet": target_pallet.master_qr_id,
+            "status": target_pallet.status,
+            "is_quality_maintained": target_pallet.is_quality_maintained
+        },
+        "timeline": transaction_data
+        })
 
 class BlockchainTransactionsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = BlockchainTransaction.objects.all()
