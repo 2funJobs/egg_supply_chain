@@ -14,7 +14,7 @@ class IsProducer(permissions.BasePermission):
         is_valid_org = org_type in ['PRODUCER']
         
         # 2. Rol kontrolü (Bu kişi bu şirkette işlem yapmaya yetkili mi?)
-        is_valid_role = user.role in ['CLERK', 'STAFF', 'ADMIN'] 
+        is_valid_role = user.role in ['STAFF', 'ADMIN'] 
         
         return is_valid_org and is_valid_role
     
@@ -47,6 +47,6 @@ class IsMarketOrLogisticsStaff(permissions.BasePermission):
         is_valid_org = org_type in ['DISTRIBUTOR', 'MARKET']
         
         # 2. Rol kontrolü (Bu kişi bu şirkette işlem yapmaya yetkili mi?)
-        is_valid_role = user.role in ['CLERK', 'STAFF', 'ADMIN'] 
+        is_valid_role = user.role in ['STAFF', 'ADMIN'] 
         
         return is_valid_org and is_valid_role

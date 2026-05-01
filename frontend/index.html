@@ -1,120 +1,13 @@
 <!DOCTYPE html>
-<html lang="tr">
-<head>
+<html lang="">
+  <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Güvenilir Gıda Takip - Blockchain</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .timeline-line::before {
-            content: '';
-            position: absolute;
-            left: 11px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background-color: #e5e7eb;
-            z-index: 0;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 font-sans antialiased flex justify-center min-h-screen">
-
-    <div class="w-full max-w-md bg-white min-h-screen shadow-xl relative">
-        
-        <div class="bg-green-600 text-white p-6 shadow-md text-center rounded-b-3xl">
-            <h1 class="text-2xl font-bold tracking-wide">Yumurta Takip</h1>
-            <p class="text-green-100 text-sm mt-1">Blokzincir Destekli Şeffaf Tedarik</p>
-        </div>
-
-        <div class="p-6">
-            <div class="flex gap-2">
-                <input type="text" id="qrInput" placeholder="QR Kod (Örn: MST-TEST-002)" 
-                       class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
-                <button onclick="fetchTimeline()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition">
-                    Sorgula
-                </button>
-            </div>
-            <p id="errorText" class="text-red-500 text-sm mt-2 hidden">Kayıt bulunamadı veya ağ hatası.</p>
-        </div>
-
-        <div id="timelineContainer" class="p-6 hidden">
-            </div>
-
-    </div>
-
-    <script>
-        async function fetchTimeline() {
-            const qrCode = document.getElementById('qrInput').value.trim();
-            const container = document.getElementById('timelineContainer');
-            const errorText = document.getElementById('errorText');
-            
-            if (!qrCode) return;
-
-            // Ekranı temizle ve yükleniyor durumuna geç
-            errorText.classList.add('hidden');
-            container.innerHTML = '<p class="text-center text-gray-500 animate-pulse">Blokzincir ağı taranıyor...</p>';
-            container.classList.remove('hidden');
-
-            try {
-                // Django API'mize İstek Atıyoruz
-                const response = await fetch(`http://127.0.0.1:8000/api/v1/pallets/${qrCode}/history/`);
-                
-                if (!response.ok) throw new Error('Bulunamadı');
-                
-                const data = await response.json();
-                renderTimeline(data);
-
-            } catch (error) {
-                container.classList.add('hidden');
-                errorText.classList.remove('hidden');
-            }
-        }
-
-        function renderTimeline(data) {
-            const container = document.getElementById('timelineContainer');
-            const isQualityMaintained = data.product_info.is_quality_maintained;
-            const status = data.product_info.status;
-            
-            // Eğer ürün bozuksa ana başlığı kırmızı yapalım
-            let statusHtml = `
-                <div class="mb-6 p-4 rounded-lg ${isQualityMaintained ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
-                    <h2 class="font-bold ${isQualityMaintained ? 'text-green-800' : 'text-red-800'}">
-                        ${isQualityMaintained ? '✅ Tüketime Uygun' : '❌ Kritik İhlal (Bozuk)'}
-                    </h2>
-                    <p class="text-sm text-gray-600 mt-1">Palet: ${data.product_info.master_qr_id}</p>
-                </div>
-                <div class="relative timeline-line">
-            `;
-
-            // Logları döngüye alıp ekrana basıyoruz
-            data.timeline.forEach((log, index) => {
-                const date = new Date(log.timestamp).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
-                const isSpoiledLog = log.status === 'SPOILED' || (log.payload && log.payload.alert);
-                
-                statusHtml += `
-                    <div class="relative z-10 pl-8 mb-8">
-                        <div class="absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white ${isSpoiledLog ? 'bg-red-500' : 'bg-green-500'} shadow"></div>
-                        
-                        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                            <span class="text-xs font-bold text-gray-400 mb-1 block">${date}</span>
-                            <h3 class="text-lg font-bold text-gray-800">${log.action_type_display}</h3>
-                            
-                            ${log.payload && log.payload.vet_notes ? `<p class="text-sm text-gray-600 mt-2 bg-gray-50 p-2 rounded">📝 "${log.payload.vet_notes}"</p>` : ''}
-                            ${log.payload && log.payload.temp ? `<p class="text-sm text-red-600 mt-2 font-bold">⚠️ Sıcaklık: ${log.payload.temp}°C</p>` : ''}
-
-                            <div class="mt-3 bg-gray-800 rounded p-2 flex items-center justify-between">
-                                <span class="text-[10px] text-gray-400 font-mono">Tx: ${log.tx_hash.substring(0, 16)}...</span>
-                                <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded">ONAYLI</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            statusHtml += `</div>`; // Timeline kapatma
-            container.innerHTML = statusHtml;
-        }
-    </script>
-</body>
+    <title>Vite App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>

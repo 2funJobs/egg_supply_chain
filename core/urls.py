@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from orders.views import OrganizationViewSet, PalletViewSet, PackageViewSet, CertificateViewSet, BlockchainTransactionsViewSet
+from orders.views import OrganizationViewSet, PalletViewSet, PackageViewSet, CertificateViewSet, BlockchainTransactionsViewSet, CustomTokenObtainPairView
 
 # Uygulamadaki viewleri route etmek icin kullan
 from orders.views import OrganizationViewSet, PalletViewSet
@@ -37,7 +37,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # Authentication endpoints
-    path("api/v1/auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/v1/auth/login/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/v1/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # Workflow endpoints

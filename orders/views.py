@@ -10,8 +10,12 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework import permissions
 from .permissions import IsProducer, IsVet, IsMarketOrLogisticsStaff
 from .models import Organization, Pallet, Package, InspectionCertificate, BlockchainTransaction
-from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer, PackageSerializer, CertificateSerializer
+from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer, PackageSerializer, CertificateSerializer, CustomTokenObtainPairSerializer
 from .services import log_to_blockchain
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 class OrganizationViewSet(viewsets.ModelViewSet):
     # Kurumlari listeleyen ve olusturan API endpoint
