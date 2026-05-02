@@ -17,9 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from orders.views import OrganizationViewSet, PalletViewSet, PackageViewSet, CertificateViewSet, BlockchainTransactionsViewSet, CustomTokenObtainPairView
-
+from rest_framework_simplejwt.views import TokenRefreshView
+from users.views import CustomTokenObtainPairView
+from orders.views import PalletViewSet, PackageViewSet
+from organizations.views import OrganizationViewSet, CertificateViewSet
+from blockchain.views import BlockchainTransactionsViewSet
 # Uygulamadaki viewleri route etmek icin kullan
 from orders.views import OrganizationViewSet, PalletViewSet
 

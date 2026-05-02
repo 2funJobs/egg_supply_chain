@@ -45,7 +45,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     # user_apps
+    'organizations',
+    'users',
     'orders',
+    'blockchain',
+    'devices',
 ]
 
 MIDDLEWARE = [
@@ -112,7 +116,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-AUTH_USER_MODEL = 'orders.User'
+AUTH_USER_MODEL = 'users.User'
 
 
 # Internationalization

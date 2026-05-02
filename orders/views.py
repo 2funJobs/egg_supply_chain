@@ -1,5 +1,4 @@
 from django.shortcuts import render, get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db import transaction
 from rest_framework import viewsets
@@ -8,38 +7,13 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import permissions
-from .permissions import IsProducer, IsVet, IsMarketOrLogisticsStaff
-from .models import Organization, Pallet, Package, InspectionCertificate, BlockchainTransaction
-from .serializers import OrganizationSerializer, PalletSerializer, BlockchainTransactionSerializer, PackageSerializer, CertificateSerializer, CustomTokenObtainPairSerializer
-from .services import log_to_blockchain
-from rest_framework_simplejwt.views import TokenObtainPairView
-
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
-
-class OrganizationViewSet(viewsets.ModelViewSet):
-    # Kurumlari listeleyen ve olusturan API endpoint
-    queryset = Organization.objects.all()
-    serializer_class = OrganizationSerializer
-
-class CertificateViewSet(viewsets.ModelViewSet):
-    queryset = InspectionCertificate.objects.all()
-    serializer_class = CertificateSerializer
-    permission_classes = [IsVet] # Sadece INSPECTOR kurumundaki VET'ler
-    lookup_field = 'certificate_no'
-
-    def perform_create(self, serializer):
-        # 1. Sertifikayı veren kurumu ata ve veritabanına kaydet
-        certificate = serializer.save(inspector=self.request.user.organization)
-        
-        # 2. Blokzincir Logu (CERT)
-        payload = {
-            "certificate_no": certificate.certificate_no,
-            "producer_org_code": certificate.producer.org_code,
-            "valid_until": str(certificate.valid_to)
-        }
-        # Palet bazlı değil, genel bir işlem olduğu için pallet=None gönderiyoruz
-        log_to_blockchain(pallet=None, user=self.request.user, action_type='CERT', payload=payload)
+from users.permissions import IsProducer, IsMarketOrLogisticsStaff
+from .models import Pallet, Package
+from organizations.models import Organization, InspectionCertificate
+from .serializers import PalletSerializer, PackageSerializer
+from blockchain.serializers import BlockchainTransactionSerializer
+from blockchain.services import log_to_blockchain
+from organizations.views import OrganizationViewSet
 
 class PalletViewSet(viewsets.ModelViewSet):
     # Paletleri listeleyen, yeni palet olusturan API endpoint
@@ -312,21 +286,3 @@ class PackageViewSet(viewsets.ModelViewSet):
             # },
             "timeline": transaction_data
         })
-
-class BlockchainTransactionsViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = BlockchainTransaction.objects.all()
-    serializer_class = BlockchainTransactionSerializer
-    
-    # 1. WEB3 STANDARDI: Detay aramalarında ID yerine Hash kullanılır
-    lookup_field = 'tx_hash'
-
-    # 2. FRONTEND'İN HAYAT KURTARICISI: Filtreleme Mekanizması
-    filter_backends = [DjangoFilterBackend]
-    
-    # Frontend'in URL sonuna soru işareti (?) ile parametre ekleyebileceği alanlar
-    filterset_fields = [
-        'pallet__master_qr_id',  # Örn: ?pallet__master_qr_id=PAL-123
-        'organization__org_code',# Örn: ?organization__org_code=ORG-A101
-        'status',                # Örn: ?status=PENDING
-        'action_type'            # Örn: ?action_type=TRAN
-    ]
