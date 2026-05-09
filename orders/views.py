@@ -14,6 +14,7 @@ from .serializers import PalletSerializer, PackageSerializer
 from blockchain.serializers import BlockchainTransactionSerializer
 from blockchain.services import log_to_blockchain
 from organizations.views import OrganizationViewSet
+from django_filters.rest_framework import DjangoFilterBackend
 
 class PalletViewSet(viewsets.ModelViewSet):
     # Paletleri listeleyen, yeni palet olusturan API endpoint
@@ -21,7 +22,11 @@ class PalletViewSet(viewsets.ModelViewSet):
     serializer_class = PalletSerializer
     # Paletlere id(QR) degeri saglayacak atama
     lookup_field = "master_qr_id"
+    filter_backends = [DjangoFilterBackend]
     
+    # Frontend'in URL sonuna soru işareti (?) ile parametre ekleyebileceği alanlar
+    filterset_fields = ['status']
+
     def get_permissions(self):
         """
         PALETLER B2B (İŞLETMELER ARASI) BİRİMLERDİR. TÜKETİCİYE KAPALIDIR.
@@ -46,53 +51,79 @@ class PalletViewSet(viewsets.ModelViewSet):
 
 # Lojistik islemler icin gerekli action
     @action(detail=True, methods=["patch"], url_path="transfer", permission_classes=[IsMarketOrLogisticsStaff])
-    def transfer(self, request, master_qr_id=None):
+    def transfer(self, request, master_qr_id=None): # master_qr_id yerine pk kullanımı Django standartıdır
         pallet = self.get_object()
+        old_status= pallet.status
 
-        # Lojistik calisani yeni urunleri aliyor
+        user_organization = request.user.organization # Kullanıcının bağlı olduğu kurum
+        
+        # 2. Request ile gelen holder_code'u sadece KONTROL için al (isteğe bağlı)
+        claimed_holder_code = request.data.get("new_holder_code")
+
+        # 3. GÜVENLİK KONTROLÜ: 
+        # Giriş yapmış kullanıcının kurum kodu ile gönderilen kod eşleşiyor mu?
+        if str(user_organization.org_code) != str(claimed_holder_code):
+            raise PermissionDenied("Başka bir kurum adına işlem yapamazsınız!")
+
+        # 1. Verileri Al
+        new_organization_type = request.data.get("current_holder.organization_type")
         new_holder_code = request.data.get("new_holder_code")
         new_status = request.data.get("status")
-
-        #eksik veri olmasi durumunda
+        is_quality_maintained = request.data.get("is_quality_maintained")
+        
+        # 2. Eksik Veri Kontrolü
         if not new_holder_code or not new_status:
             return Response({"error": "new_holder_code ve status alanlari eksik"}, status=400)
-        # 3. Yeni sahibin (kurumun) veritabanında gerçekten var olup olmadığını kontrol et
-        new_holder = get_object_or_404(Organization, org_code=new_holder_code)
-        courier_wallet = request.user.wallet_address
 
-        # Log için eski sahibin adını kenara not alalım
+        # 3. İş Mantığı Doğrulaması (Business Logic)
+        print(f"DEBUG: Eski Durum: '{old_status}', Yeni Durum: '{new_status}'")
+        
+        if old_status == "IN_PRODUCTION" and new_status == "AT_MARKET":
+            raise PermissionDenied("Üreticiden doğrudan markete transfer yapılamaz!")
+
+        # 4. Not Belirleme (Düzeltilen Kısım)
+        # request.data immutable (değiştirilemez) olabileceği için yerel değişken kullanıyoruz
+        note_text = request.data.get("notes")
+        if not note_text:
+            if new_status == "AT_MARKET" and is_quality_maintained is False:
+                note_text = "Sıcaklık ve Nem birimi eksik yada uygunsuz."
+            else:
+                note_text = "Transfer standart prosedürlere uygun gerçekleşti."
+
+        # 5. İlişkili Objeyi Bul
+        new_holder = get_object_or_404(Organization, org_code=new_holder_code)
+        
+        # 6. Güncelleme İşlemleri
         old_holder_name = pallet.current_holder.name if pallet.current_holder else "Bilinmiyor"
         transfer_date = timezone.now().isoformat()
-    # --- ADIM A: POSTGRESQL GÜNCELLEMESİ ---
+        courier_wallet = getattr(request.user, 'wallet_address', None) # Güvenli erişim
+
+        # PostgreSQL Güncelleme
         pallet.current_holder = new_holder
         pallet.status = new_status
-        pallet.save() # Veritabanına kalıcı olarak yazıldı!
+        pallet.save()
 
-    # --- ADIM B: BLOKZİNCİR GÜNCELLEMESİ (DUAL WRITE) ---
+        # 7. Blokzincir Loglama
         payload_data = {
             "transfer_from_org": old_holder_name,
             "transfer_to_org_code": new_holder.org_code,
             "new_status": new_status,
             "timestamp": transfer_date,
-            "notes": request.data.get("notes", "Transfer standart prosedürlere uygun gerçekleşti.")
+            "notes": note_text # Düzeltilen yerel değişken
         }
 
-    # log_to_blockchain servisine verileri gönderiyoruz.
         dynamic_action_type = 'RECV' if new_holder.organization_type == 'MARKET' else 'TRAN'
-    # İşlem tipi olarak market ya da lojistik olma durumuna göre 
-    # 'TRAN' (Transfer/Lojistik) yada RECV kodunu kullanıyoruz.
+        
         log = log_to_blockchain(
             pallet=pallet, 
-            user=request.user, # İşlemi yapan şoför/market yetkilisi
+            user=request.user, 
             action_type=dynamic_action_type, 
             payload=payload_data
         )
 
-        # 4. İstemciye (Mobil Uygulamaya) Başarı Yanıtı ve Makbuz (TxID) Dön
-       # 4. İstemciye (Mobil Uygulamaya) Başarı Yanıtı ve Takip Numarası Dön
         return Response({
             "message": f"Palet mülkiyeti başarıyla {new_holder.name} kurumuna devredildi.",
-            "tracking_id": log.id, # txid yerine yerel veritabanı ID'sini dönüyoruz
+            "tracking_id": log.id,
             "status_info": "İşlem blokzincir kuyruğuna alındı.",
             "courier_verified": bool(courier_wallet),
             "new_status": pallet.status
@@ -119,12 +150,12 @@ class PalletViewSet(viewsets.ModelViewSet):
 
         # Kural Kontrolü
         if (15 <= temp_val <= 26) and (70 <= humidity_val <= 85):
+           pallet.is_quality_maintained = True
            return Response({
                 "status": "OK",
                 "message": f"Veri alındı. (Sıcaklık: {temp_val}°C, Nem: {humidity_val}%) - Mevzuata Uygun."
             })
         else:
-            pallet.is_quality_maintained = False
             pallet.status = "FAULTY"
             pallet.save()
 
@@ -183,18 +214,30 @@ class PackageViewSet(viewsets.ModelViewSet):
     lookup_field = "package_qr_id"
 
     def get_permissions(self):
+       queryset = Package.objects.all()
+    serializer_class = PackageSerializer
+    lookup_field = "package_qr_id"
+
+    def get_permissions(self):
         """
-        DİNAMİK YETKİ:
-        - Tüketici okur (AllowAny)
-        - Üretici yaratır (IsProducer)
-        - Kimse güncelleyemez (Güvenlik)
+        THE HYBRID TRACEABILITY MODEL:
+        - /packages/ (list): Sadece Üretici (B2B Gizliliği)
+        - /packages/ID/ (retrieve): Sadece Üretici (B2B Gizliliği)
+        - /packages/ID/history/ (get_history): HERKES (Tüketici Şeffaflığı)
         """
-        if self.action in ['list', 'retrieve', 'get_history']:
+        
+        if self.action == 'get_history':
+            # Consumers scanning the QR code ONLY hit this endpoint. 
+            # They get to see the blockchain timeline and that's it.
             permission_classes = [AllowAny]
-        elif self.action == 'create':
-            permission_classes = [IsProducer] # YALNIZCA ÜRETİCİ YENİ PAKET GİREBİLİR
+            
+        elif self.action in ['list', 'retrieve', 'create']:
+            # The actual raw package data and the full list are locked down
+            # to internal supply chain staff only.
+            permission_classes = [IsProducer] 
+            
         else:
-            # PUT, PATCH, DELETE işlemlerine kimsenin yetkisi yok
+            # PUT, PATCH, DELETE 
             permission_classes = [permissions.IsAdminUser] 
             
         return [permission() for permission in permission_classes]

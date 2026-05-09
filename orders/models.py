@@ -19,7 +19,7 @@ class Pallet(models.Model):
 
 # Güvenlik ve Kalite Metrikleri
     vet_approval = models.BooleanField(default=False, verbose_name="Vet Approval")
-    is_quality_maintained = models.BooleanField(default=True, verbose_name="Quality/Temperature Ensured?")
+    is_quality_maintained = models.BooleanField(default=False, verbose_name="Quality/Temperature Ensured?")
     departure_date = models.DateTimeField(null=True, blank=True, verbose_name="Çıkış Tarihi")
     created_at = models.DateTimeField(auto_now_add=True)
 

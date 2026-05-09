@@ -24,6 +24,7 @@ from organizations.views import OrganizationViewSet, CertificateViewSet
 from blockchain.views import BlockchainTransactionsViewSet
 # Uygulamadaki viewleri route etmek icin kullan
 from orders.views import OrganizationViewSet, PalletViewSet
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # Otomatik URL routing icin Router tanimlanir.
 # Uç noktaları (endpoints) kaydediyoruz
@@ -44,4 +45,6 @@ urlpatterns = [
 
     # Workflow endpoints
     path("api/v1/", include(router.urls)),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]
