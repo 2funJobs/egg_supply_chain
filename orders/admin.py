@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Pallet, Package
+from .models import Pallet, Package, MarketOrder
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -14,3 +14,8 @@ class PalletAdmin(admin.ModelAdmin):
 class PackageAdmin(admin.ModelAdmin):
     list_display = ('package_qr_id', 'pallet', 'laying_date', 'expiry_date')
     search_fields = ('package_qr_id', 'pallet_master_qr_id')
+
+@admin.register(MarketOrder)
+class MarketOrderAdmin(admin.ModelAdmin):
+    list_display = ('market', 'assigned_producer', 'fulfilled_pallet', 'status')
+    search_fields = ('market', 'assigned_producer')

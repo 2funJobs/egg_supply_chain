@@ -65,3 +65,46 @@ class Package(models.Model):
 
     def __str__(self):
         return f"Package: {self.package_qr_id}"
+    
+    # 1. The Main Order (The "Shopping Cart")
+def generate_order_code():
+    # Benzersiz, tahmin edilemez ve kısa bir ID üretir: Örn: "ORD-9F86D081"
+    return f"ORD-{uuid.uuid4().hex[:8].upper()}"
+
+
+class MarketOrder(models.Model):
+    # SİHİRLİ SATIR: id alanını eziyoruz. Artık integer değil, kendi ürettiğimiz format PK oldu.
+    id = models.CharField(primary_key=True, max_length=12, default=generate_order_code, editable=False)
+    
+    ORDER_STATUS = [
+        ('DRAFT', 'In Cart / Building Order'),
+        ('PENDING', 'Pending Assignment'),
+        ('ASSIGNED', 'Assigned to Producer'),
+        ('IN_PRODUCTION', 'Producer Preparing Pallet'),
+        ('SHIPPED', 'Shipped'),
+        ('DELIVERED', 'Delivered')
+    ]
+
+    market = models.ForeignKey("organizations.Organization", on_delete=models.CASCADE, related_name="placed_orders")
+    assigned_producer = models.ForeignKey("organizations.Organization", on_delete=models.SET_NULL, null=True, blank=True, related_name="received_orders")
+    
+    fulfilled_pallet = models.OneToOneField("Pallet", on_delete=models.SET_NULL, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=ORDER_STATUS, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.id} - {self.market.name}"
+
+
+class MarketOrderItem(models.Model):
+    # order ForeignKey'i, MarketOrder'ın yeni CharField(id) yapısına OTOMATİK uyum sağlar.
+    order = models.ForeignKey(MarketOrder, on_delete=models.CASCADE, related_name="items")
+    
+    # (Sende Package modeli import edilmiş olmalı)
+    feeding_type = models.IntegerField(choices=Package.FEEDING_TYPE, verbose_name="Requested Feeding Type")
+    capacity = models.IntegerField(choices=Package.CAPACITY, verbose_name="Requested Capacity")
+    package_quantity = models.PositiveIntegerField(verbose_name="How many packages?")
+    
+    def __str__(self):
+        return f"{self.order.id} | {self.package_quantity}x {self.get_feeding_type_display()} ({self.get_capacity_display()})"
+    

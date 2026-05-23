@@ -19,7 +19,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from users.views import CustomTokenObtainPairView
-from orders.views import PalletViewSet, PackageViewSet
+from orders.views import PalletViewSet, PackageViewSet, MarketOrderViewSet, MarketOrderItemViewSet
 from organizations.views import OrganizationViewSet, CertificateViewSet
 from blockchain.views import BlockchainTransactionsViewSet
 # Uygulamadaki viewleri route etmek icin kullan
@@ -34,6 +34,8 @@ router.register(r'certificates', CertificateViewSet, basename='certificate')
 router.register(r'pallets', PalletViewSet, basename='pallet')
 router.register(r'packages', PackageViewSet, basename='package')
 router.register(r'blockchain-logs', BlockchainTransactionsViewSet, basename='blockchain-log')
+router.register(r'orders', MarketOrderViewSet, basename='order')
+router.register(r'order-items', MarketOrderItemViewSet, basename='order-item')
 
 urlpatterns = [
     # Admin endpoints
