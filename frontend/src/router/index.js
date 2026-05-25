@@ -23,6 +23,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/organizations',
+    name: 'organizations',
+    component: () => import('../views/OrganizationsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/packages',
     name: 'packages',
     component: () => import('../views/PackagesView.vue'),

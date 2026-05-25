@@ -6,7 +6,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { usePermissions } from './composables/usePermissions'
 
-const { canViewPackages } = usePermissions()
+const { canViewPackages, canCreatePallet, canTransferPallet } = usePermissions()
 
 // useRouter() gives you the router instance to navigate programmatically.
 // useRoute() gives you the currently active route object (path, params, etc.)
@@ -34,7 +34,7 @@ const handleLogout = () => {
          Mobile:  fixed bottom bar (common mobile app pattern)
          Desktop: sticky left sidebar
          ===================================================================== -->
-    <nav
+    <nav 
       v-if="auth.isAuthenticated"
       class="
         fixed bottom-0 w-full bg-white border-t border-stone-200 px-2 py-2
@@ -68,7 +68,7 @@ const handleLogout = () => {
         <span class="text-[10px] md:text-sm font-semibold">Dashboard</span>
       </RouterLink>
 
-      <RouterLink
+      <RouterLink v-if="canCreatePallet || canTransferPallet"
         to="/pallets"
         class="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:w-full
                md:px-4 md:py-3 md:rounded-xl transition-colors px-4 py-1.5"

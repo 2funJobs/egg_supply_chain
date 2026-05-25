@@ -25,39 +25,19 @@ export function usePermissions() {
   const auth = useAuthStore()
 
   // storeToRefs() extracts reactive refs from a Pinia store while preserving
-  // reactivity. Without it, destructuring a store can silently break reactivity
-  // and computed() won't update when the store changes.
-  const { user, orgType } = storeToRefs(auth)
+  // reactivity. We NO LONGER extract 'orgType' because we strictly rely on
+  // the securely decoded JWT role.
+  const { user } = storeToRefs(auth)
 
-  const role    = computed(() => user.value?.role ?? '')
-  const orgT    = computed(() => orgType.value ?? '')
+  const role = computed(() => user.value?.role ?? '')
 
-  // A user is considered a "producer" if:
-  //   - their JWT role claim IS 'PRODUCER', OR
-  //   - their org type (fetched from /organizations/) is 'PRODUCER'
-  const isProducer = computed(() =>
-    role.value === 'PRODUCER' || orgT.value === 'PRODUCER'
-  )
-
-  const isDistributor = computed(() =>
-    role.value === 'DISTRIBUTOR' || orgT.value === 'DISTRIBUTOR'
-  )
-
-  const isMarket = computed(() =>
-    role.value === 'MARKET' || orgT.value === 'MARKET'
-  )
-
-  const isInspector = computed(() =>
-    role.value === 'INSPECTOR' || orgT.value === 'INSPECTOR'
-  )
-
-  const isVet = computed(() =>
-    role.value === 'VET' || role.value === 'INSPECTOR'
-  )
-
-  const isAdmin = computed(() =>
-    ['ADMIN', 'ORG_ADMIN'].includes(role.value)
-  )
+  // Evaluate permissions strictly based on the JWT role claim.
+  const isProducer = computed(() => role.value === 'PRODUCER')
+  const isDistributor = computed(() => role.value === 'DISTRIBUTOR')
+  const isMarket = computed(() => role.value === 'MARKET')
+  const isInspector = computed(() => role.value === 'INSPECTOR')
+  const isVet = computed(() => role.value === 'VET' || role.value === 'INSPECTOR')
+  const isAdmin = computed(() => ['ADMIN', 'ORG_ADMIN'].includes(role.value))
 
   // ── Write permissions ────────────────────────────────────────────────────────
 
@@ -88,6 +68,5 @@ export function usePermissions() {
     isVet,
     // Raw values (useful for debugging or complex conditions)
     role,
-    orgType: orgT,
   }
 }

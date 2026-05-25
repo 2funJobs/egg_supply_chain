@@ -81,7 +81,7 @@ export const blockchain = {
 }
 
 export const organizations = {
-  list: () => api.get('/organizations/'),
+  list: (params = {}) => api.get('/organizations/', { params }),
   get: (code) => api.get(`/organizations/${code}/`),
 }
 

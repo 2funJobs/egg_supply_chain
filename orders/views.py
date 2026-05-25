@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import permissions
@@ -46,11 +46,11 @@ class PalletViewSet(viewsets.ModelViewSet):
             
         # 3. Güvenlik: Paletler manuel güncellenemez veya silinemez (Blokzincir bütünlüğü)
         elif self.action in ['update', 'partial_update', 'destroy']:
-            permission_classes = [permissions.IsAdminUser] # Sadece sistem admini (Django Admin)
+            permission_classes = [IsAdminUser] # Sadece sistem admini (Django Admin)
             
         # 4. Görüntüleme (Listeleme/Detay): Tüm sistem paydaşları okuyabilir
         else:
-            permission_classes = [IsAuthenticated]
+            permission_classes = [IsMarketOrLogisticsStaff | IsProducer]
             
         return [permission() for permission in permission_classes]
 

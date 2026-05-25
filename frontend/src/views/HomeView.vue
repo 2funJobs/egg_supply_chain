@@ -3,9 +3,10 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { usePermissions } from '../composables/usePermissions'
-import { pallets as palletsApi, blockchain as blockchainApi, packages as packagesApi } from '../api'
+import { pallets as palletsApi, blockchain as blockchainApi, packages as packagesApi, organizations as organizationsApi} from '../api'
 import StatCard from '../components/StatCard.vue'
 import PalletCard from '../components/PalletCard.vue'
+import OrganizationCard from '../components/OrganizationCard.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -13,12 +14,26 @@ const auth = useAuthStore()
 // Call the composable — destructure only the booleans this view needs
 const { canCreatePallet, canTransferPallet, canCreateCertificate } = usePermissions()
 
+const recentOrganizations = ref([])
 const recentPallets = ref([])
 const stats = ref({ pallets: 0, transactions: 0 })
 const loading = ref(true)
 const error = ref(null)
 
-onMounted(async () => {
+onMounted(async () => {  
+  // 1. FETCH ORGANIZATIONS ALONE
+  if (auth.user?.role === 'INSPECTOR') {
+      try {
+        const orgsRes = await organizationsApi.list({ type: 'PRODUCER' })    
+        const od = orgsRes.data || orgsRes
+        const allOrgs = Array.isArray(od) ? od : (od?.results || [])
+        stats.value.organizations = Array.isArray(od) ? od.length : (od?.count ?? allOrgs.length)
+        recentOrganizations.value = allOrgs.slice(0, 4)
+      } catch (err) {
+        console.warn("Organizasyonlar çekilemedi veya yetki reddedildi:", err)
+        // Sayfayı tamamen bozmamak için burada error.value set etmiyoruz, sadece logluyoruz.
+      }
+    }
   try {
     const [palletsRes, logsRes] = await Promise.all([
       palletsApi.list(),
@@ -30,6 +45,7 @@ onMounted(async () => {
     stats.value.pallets      = Array.isArray(pd) ? pd.length : (pd.count ?? allPallets.length)
     stats.value.transactions = Array.isArray(ld) ? ld.length : (ld.count ?? (ld.results?.length ?? 0))
     recentPallets.value = allPallets.slice(0, 4)
+    // Handle Organizations (using the exact same safe-parsing logic you used above)
   } catch {
     error.value = 'Could not connect to the backend. Make sure Django is running on port 8000.'
   } finally {
@@ -69,15 +85,32 @@ onMounted(async () => {
       </div>
 
       <!-- Stats row — uses the StatCard component -->
-      <div class="grid grid-cols-3 gap-3">
+      <div v-if="canCreatePallet" class="grid grid-cols-3 gap-3">
         <StatCard label="Pallets"   :value="stats.pallets"       :loading="loading" />
         <StatCard label="Tx Logs"   :value="stats.transactions"  :loading="loading" />
         <StatCard label="Chain OK"  emoji="🔗" />
       </div>
     </div>
-
+    <!-- <button
+        v-if="canCreateCertificate"
+        @click="router.push('/pallets')"
+        class="bg-emerald-700 rounded-2xl p-4 shadow-sm flex flex-col
+                items-center gap-2.5 hover:bg-emerald-800 transition-all active:scale-95">
+        <div class="bg-white/20 text-white p-3 rounded-xl">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0
+                  3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946
+                  3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138
+                  3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806
+                  3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438
+                  3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+          </svg>
+        </div>
+        <span class="text-xs font-bold text-white">Certificate</span>
+      </button> -->
     <!-- CONTENT -->
-    <div class="px-5 py-6 space-y-7">
+    <div v-if="canCreatePallet || canTransferPallet" class="px-5 py-6 space-y-7">
 
       <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm flex gap-3">
         <span class="shrink-0">⚠️</span>
@@ -177,27 +210,8 @@ onMounted(async () => {
           </button>
 
           <!-- INSPECTOR / VET only: issue certificates -->
-          <button
-            v-if="canCreateCertificate"
-            @click="router.push('/pallets')"
-            class="bg-emerald-700 rounded-2xl p-4 shadow-sm flex flex-col
-                   items-center gap-2.5 hover:bg-emerald-800 transition-all active:scale-95">
-            <div class="bg-white/20 text-white p-3 rounded-xl">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0
-                     3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946
-                     3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138
-                     3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806
-                     3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438
-                     3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
-              </svg>
-            </div>
-            <span class="text-xs font-bold text-white">Certificate</span>
-          </button>
         </div>
       </div>
-
       <!-- RECENT PALLETS — uses PalletCard component -->
       <div>
         <div class="flex justify-between items-center mb-3">
@@ -228,8 +242,59 @@ onMounted(async () => {
           />
         </div>
       </div>
-
       <div class="h-4"></div>
+    </div>
+    <!-- INSPECTOR / VET only: issue certificates -->
+    <div class="grid grid-cols-3 gap-3 m-3">
+      <button
+        v-if="canCreateCertificate"
+        @click="router.push('/organizations')"
+        class="bg-emerald-700 rounded-2xl p-4 shadow-sm flex flex-col
+                items-center gap-2.5 hover:bg-emerald-800 transition-all active:scale-95">
+        <div class="bg-white/20 text-white p-3 rounded-xl">
+          <svg class="w-6 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0
+                  3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946
+                  3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138
+                  3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806
+                  3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438
+                  3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+          </svg>
+        </div>
+        <span class="text-xs font-bold text-white">Certificate</span>
+      </button>
+    <!-- CONTENT -->
+    </div>
+    <div v-if="canCreateCertificate">
+      <div class=" margin flex justify-between items-center m-3">
+        <h3 class="text-xs font-black text-stone-400 uppercase tracking-widest">Organizations</h3>
+        <button @click="router.push('/organizations')" class="text-xs font-bold text-amber-600 hover:text-amber-700">
+          See all →
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="space-y-3">
+        <div v-for="i in 3" :key="i" class="bg-white rounded-2xl h-20 animate-pulse border border-stone-100"></div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="recentOrganizations.length === 0"
+          class="bg-white rounded-2xl p-10 text-center border border-stone-100 shadow-sm">
+        <div class="text-5xl mb-3">🏢</div>
+        <p class="text-stone-600 font-bold">No organizations yet</p>
+      </div>
+
+      <!-- Populated State -->
+      <div v-else class="space-y-3">
+        <OrganizationCard
+          v-for="org in recentOrganizations"
+          :key="org.org_code" 
+          :organization="org"
+          @click="router.push(`/organizations/${org.org_code}`)"
+        />
+      </div>
     </div>
   </div>
 </template>
