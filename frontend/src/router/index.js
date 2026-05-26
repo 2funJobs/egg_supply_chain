@@ -69,6 +69,18 @@ const routes = [
     component: () => import('../views/HistoryView.vue'),
     // No requiresAuth — this page is public so consumers can scan QR codes
   },
+  {
+  path: '/orders',
+  name: 'orders',
+  component: () => import('../views/OrderView.vue'),
+  meta: { requiresAuth: true },
+  },
+  {
+  path: '/producer-orders',
+  name: 'producerOrders',
+  component: () => import('../views/ProducerOrdersView.vue'),
+  meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

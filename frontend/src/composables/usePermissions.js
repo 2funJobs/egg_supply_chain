@@ -49,6 +49,8 @@ export function usePermissions() {
     isDistributor.value || isMarket.value
   )
 
+  const canViewOrders = computed(() => isMarket.value || isProducer.value)
+
   // Inspectors/vets issue health certificates for producer farms
   const canCreateCertificate = computed(() =>
     isInspector.value || isVet.value
@@ -56,6 +58,7 @@ export function usePermissions() {
 
   return {
     // Boolean permission gates — use these directly in v-if
+    canViewOrders,
     canCreatePallet,
     canTransferPallet,
     canCreateCertificate,

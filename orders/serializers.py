@@ -8,6 +8,10 @@ class PalletSerializer(serializers.ModelSerializer):
 
     producer = serializers.SlugRelatedField(slug_field='org_code', read_only=True)
     current_holder = serializers.SlugRelatedField(slug_field='org_code', read_only=True)
+    destination_market_detail = OrganizationSerializer(
+        source='destination_market',
+        read_only=True
+    )
 
     class Meta:
         model = Pallet
@@ -15,7 +19,8 @@ class PalletSerializer(serializers.ModelSerializer):
             'master_qr_id', 'producer', 'producer_detail', 
             'current_holder', 'current_holder_detail', 
             'status', 'vet_approval', 'is_quality_maintained', 
-            'departure_date', 'created_at'
+            'departure_date', 'created_at','destination_market',
+            'destination_market_detail',
         ]
         
         # Bu alanları read_only yaparsak, DRF artık POST isteğinde bu verileri kullanıcıdan beklemez.

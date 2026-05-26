@@ -53,7 +53,7 @@ const handleLogin = async () => {
       3. FORM SECTION (The white card)
       This card is positioned to slightly overlap the gradient, like image_0.png
     -->
-    <div class="flex-grow px-6 relative -top-12">
+    <div class="mx-auto flex-row px-6 relative -top-12">
       <div class="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 flex flex-col gap-6">
         
         <div class="text-center">

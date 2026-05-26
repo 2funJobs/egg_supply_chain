@@ -6,7 +6,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { usePermissions } from './composables/usePermissions'
 
-const { canViewPackages, canCreatePallet, canTransferPallet } = usePermissions()
+const { canViewPackages, canCreatePallet, canTransferPallet, canViewOrders, isMarket } = usePermissions()
 
 // useRouter() gives you the router instance to navigate programmatically.
 // useRoute() gives you the currently active route object (path, params, etc.)
@@ -81,6 +81,22 @@ const handleLogout = () => {
             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
         </svg>
         <span class="text-[10px] md:text-sm font-semibold">Pallets</span>
+      </RouterLink>
+
+      <RouterLink
+        v-if="canViewOrders"
+        :to="isMarket ? '/orders' : '/producer-orders'"
+        class="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:w-full
+              md:px-4 md:py-3 md:rounded-xl transition-colors px-4 py-1.5"
+        :class="isActive('/orders')
+          ? 'text-amber-600 md:bg-amber-50'
+          : 'text-stone-400 hover:text-amber-500 md:hover:bg-stone-100'"
+        >
+        <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        <span class="text-[10px] md:text-sm font-semibold">Siparişler</span>
       </RouterLink>
 
       <RouterLink

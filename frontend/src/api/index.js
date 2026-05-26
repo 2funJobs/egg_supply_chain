@@ -90,4 +90,17 @@ export const certificates = {
   create: (data) => api.post('/certificates/', data),
 }
 
+export const orders = {
+  myCart:   ()        => api.get('/orders/my-cart/'),
+  list:     (params)  => api.get('/orders/', { params }),
+  checkout: (id)      => api.post(`/orders/${id}/checkout/`),
+  accept:   (id)      => api.post(`/orders/${id}/accept/`),
+}
+
+export const orderItems = {
+  create: (data) => api.post('/order-items/', data),
+  update: (id, data) => api.patch(`/order-items/${id}/`, data),
+  remove: (id)   => api.delete(`/order-items/${id}/`),
+}
+
 export default api

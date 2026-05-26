@@ -59,9 +59,23 @@ class PalletViewSet(viewsets.ModelViewSet):
     def transfer(self, request, master_qr_id=None): # master_qr_id yerine pk kullanımı Django standartıdır
         pallet = self.get_object()
         old_status= pallet.status
+        user_organization = request.user.organization
+        # Kullanıcının bağlı olduğu kurum
 
-        user_organization = request.user.organization # Kullanıcının bağlı olduğu kurum
+        # 1. Zaten sizde olan paleti tekrar alamazsınız
+        if pallet.current_holder == user_organization:
+            return Response(
+                {"error": "Bu palet zaten sizde bulunuyor."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
+        # 2. Market teslim alıyorsa: sadece siparişin sahibi market alabilir
+        if user_organization.organization_type == 'MARKET':
+            if pallet.destination_market and pallet.destination_market != user_organization:
+                raise PermissionDenied(
+                    "Bu palet size ait bir siparişe bağlı değil. Teslim alamazsınız."
+                )
+
         # 2. Request ile gelen holder_code'u sadece KONTROL için al (isteğe bağlı)
         claimed_holder_code = request.data.get("new_holder_code")
 
@@ -79,9 +93,6 @@ class PalletViewSet(viewsets.ModelViewSet):
         # 2. Eksik Veri Kontrolü
         if not new_holder_code or not new_status:
             return Response({"error": "new_holder_code ve status alanlari eksik"}, status=400)
-
-        # 3. İş Mantığı Doğrulaması (Business Logic)
-        print(f"DEBUG: Eski Durum: '{old_status}', Yeni Durum: '{new_status}'")
         
         if old_status == "IN_PRODUCTION" and new_status == "AT_MARKET":
             raise PermissionDenied("Üreticiden doğrudan markete transfer yapılamaz!")
@@ -108,9 +119,21 @@ class PalletViewSet(viewsets.ModelViewSet):
         pallet.status = new_status
         pallet.save()
 
+        linked_order = MarketOrder.objects.filter(fulfilled_pallet=pallet).first()
+        if linked_order:
+            if (user_organization.organization_type == 'DISTRIBUTOR'
+                    and linked_order.status == 'IN_PRODUCTION'):
+                linked_order.status = 'SHIPPED'
+                linked_order.save()
+            elif (user_organization.organization_type == 'MARKET'
+                    and linked_order.status == 'SHIPPED'):
+                linked_order.status = 'DELIVERED'
+                linked_order.save()
+
         # 7. Blokzincir Loglama
         payload_data = {
             "transfer_from_org": old_holder_name,
+            "transfer_to_org_name": new_holder.name,
             "transfer_to_org_code": new_holder.org_code,
             "new_status": new_status,
             "timestamp": transfer_date,
@@ -359,13 +382,14 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
         serializer.save(market=user_org, status='DRAFT')
 
     @action(detail=False, methods=['get', 'post'], url_path='my-cart')
+    @transaction.atomic
     def my_cart(self, request):
         user_org = request.user.organization
         if user_org.organization_type != 'MARKET':
             raise PermissionDenied("Only markets can have a shopping cart.")
 
         order, created = MarketOrder.objects.get_or_create(
-            market=user_org, 
+            market=user_org,
             status='DRAFT'
         )
         serializer = self.get_serializer(order)
@@ -373,6 +397,7 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
 
     # NEW: Checkout logic moved inside the ViewSet
     @action(detail=True, methods=['post'], url_path='checkout')
+    @transaction.atomic
     def checkout(self, request, pk=None):
         order = self.get_object() # Automatically handles 404 safely
         
@@ -413,8 +438,8 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
             "distance_km": round(shortest_distance, 2)
         })
 
-    @transaction.atomic
     @action(detail=True, methods=['post'], url_path='accept')
+    @transaction.atomic
     def accept_order(self, request, pk=None):
         order = self.get_object()
         
@@ -447,6 +472,7 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
         new_pallet = Pallet.objects.create(
             producer=producer_org,
             current_holder=producer_org,
+            destination_market=order.market,
             departure_date=departure_date,
             status='IN_PRODUCTION',
             vet_approval=True  # Sertifika olduğu için otomatik True!
@@ -514,7 +540,10 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
 
 class MarketOrderItemViewSet(viewsets.ModelViewSet):
     serializer_class = MarketOrderItemSerializer
-    queryset = MarketOrderItem.objects.all()
+    # Her marketin kendine ait sepet itemleri
+    def get_queryset(self):
+        user_org = self.request.user.organization
+        return MarketOrderItem.objects.filter(order__market=user_org)
 
     # YENİ: Dizi (Array) şeklindeki JSON'ları kabul etmek için many=True ayarı
     def get_serializer(self, *args, **kwargs):

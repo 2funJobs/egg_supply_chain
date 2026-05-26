@@ -24,11 +24,11 @@ defineEmits(['click'])
         <p class="font-black text-stone-800 font-mono text-sm truncate">
           {{ package.package_qr_id }}
         </p>
-        <p class="text-xs text-stone-500 mt-0.5 truncate">
-          {{ package.pallet_detail.producer_detail?.name || package.pallet_detail.producer || '—' }}
-        </p>
+        <!-- <p class="text-xs text-stone-500 mt-0.5 truncate">
+          {{ package.pallet.producer }}
+        </p> -->
       </div>
-      <StatusBadge :status="package.pallet_detail.status" variant="package" class="shrink-0" />
+      <!-- <StatusBadge :status="package.pallet_detail.status" variant="package" class="shrink-0" /> -->
     </div>
 
     <!-- Named slot: the parent can inject a footer here.

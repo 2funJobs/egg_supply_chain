@@ -22,6 +22,13 @@ class Pallet(models.Model):
     is_quality_maintained = models.BooleanField(default=False, verbose_name="Quality/Temperature Ensured?")
     departure_date = models.DateTimeField(null=True, blank=True, verbose_name="Çıkış Tarihi")
     created_at = models.DateTimeField(auto_now_add=True)
+    destination_market = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="incoming_pallets",
+        verbose_name="Hedef Market"
+    )
 
     def save(self, *args, **kwargs):
         # Eğer bu palet ilk defa oluşturuluyorsa (henüz QR kodu yoksa) otomatik üret!
@@ -95,6 +102,14 @@ class MarketOrder(models.Model):
     def __str__(self):
         return f"{self.id} - {self.market.name}"
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['market'],
+                condition=models.Q(status='DRAFT'),
+                name='unique_draft_order_per_market'
+            )
+        ]
 
 class MarketOrderItem(models.Model):
     # order ForeignKey'i, MarketOrder'ın yeni CharField(id) yapısına OTOMATİK uyum sağlar.
