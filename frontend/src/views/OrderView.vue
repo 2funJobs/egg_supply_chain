@@ -30,12 +30,31 @@ const STATUS_META = {
   IN_PRODUCTION: { label: 'Hazırlanıyor',     color: 'text-orange-600',  bg: 'bg-orange-50',  border: 'border-orange-200'  },
   SHIPPED:       { label: 'Yolda',            color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200'    },
   DELIVERED:     { label: 'Teslim Edildi',    color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  CANCELLED:     { label: 'İptal Edildi', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const activeView     = ref('cart')
 const error          = ref(null)
+const cancelConfirming = ref(null)   // onay beklenen sipariş ID'si
+const cancelling       = ref(null)   // istek atılan sipariş ID'si
+
+const confirmCancel = (orderId) => { cancelConfirming.value = orderId }
+const abortCancel   = ()        => { cancelConfirming.value = null    }
+
+const cancelOrder = async (orderId) => {
+  cancelling.value       = orderId
+  cancelConfirming.value = null
+  try {
+    await ordersApi.cancel(orderId)
+    await fetchAllOrders()
+  } catch (e) {
+    error.value = e.response?.data?.error || 'Sipariş iptal edilemedi.'
+  } finally {
+    cancelling.value = null
+  }
+}
 
 // Sepet
 const cart           = ref(null)
@@ -383,39 +402,92 @@ onMounted(fetchCart)
             </div>
 
             <!-- Durum adım göstergesi -->
-            <div class="px-5 pb-5 pt-4 border-t border-stone-50">
-              <div class="flex items-start">
-                <template v-for="(step, i) in STATUS_STEPS" :key="step.key">
-                  <div class="flex flex-col items-center">
-                    <div
-                      class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors"
-                      :class="stepIndex(order.status) >= i
-                        ? 'bg-orange-500 text-white shadow-sm'
-                        : 'bg-stone-100 text-stone-400'"
-                    >
-                      <!-- Tamamlanmış adım -->
-                      <svg
-                        v-if="stepIndex(order.status) > i"
-                        class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            <div v-if="order.status !== 'CANCELLED'" class="px-5 pb-5 pt-4 border-t border-stone-50">
+              <div class="px-5 pb-5 pt-4 border-t border-stone-50">
+                <div class="flex items-start">
+                  <template v-for="(step, i) in STATUS_STEPS" :key="step.key">
+                    <div class="flex flex-col items-center">
+                      <div
+                        class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors"
+                        :class="stepIndex(order.status) >= i
+                          ? 'bg-orange-500 text-white shadow-sm'
+                          : 'bg-stone-100 text-stone-400'"
                       >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
-                      </svg>
-                      <!-- Aktif / bekleyen adım -->
-                      <span v-else class="text-xs font-bold">{{ i + 1 }}</span>
+                        <!-- Tamamlanmış adım -->
+                        <svg
+                          v-if="stepIndex(order.status) > i"
+                          class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <!-- Aktif / bekleyen adım -->
+                        <span v-else class="text-xs font-bold">{{ i + 1 }}</span>
+                      </div>
+                      <span class="text-[10px] text-stone-500 mt-1.5 text-center w-14 leading-tight">
+                        {{ step.label }}
+                      </span>
                     </div>
-                    <span class="text-[10px] text-stone-500 mt-1.5 text-center w-14 leading-tight">
-                      {{ step.label }}
-                    </span>
-                  </div>
-                  <!-- Adımlar arası çizgi -->
-                  <div
-                    v-if="i < STATUS_STEPS.length - 1"
-                    class="flex-1 h-0.5 mt-3.5 mx-1 transition-colors"
-                    :class="stepIndex(order.status) > i ? 'bg-orange-400' : 'bg-stone-200'"
-                  />
-                </template>
+                    <!-- Adımlar arası çizgi -->
+                    <div
+                      v-if="i < STATUS_STEPS.length - 1"
+                      class="flex-1 h-0.5 mt-3.5 mx-1 transition-colors"
+                      :class="stepIndex(order.status) > i ? 'bg-orange-400' : 'bg-stone-200'"
+                    />
+                  </template>
+                </div>
               </div>
             </div>
+            <!--  -->
+            <div v-else class="px-5 pb-4 pt-3 border-t border-red-50 flex items-center gap-2 text-sm text-red-500">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              Bu sipariş iptal edildi.
+            </div>
+
+            <!-- İptal butonu: yalnızca ASSIGNED siparişlerde -->
+            <div v-if="order.status === 'ASSIGNED'" class="px-5 pb-5">
+
+              <!-- Onay sorusu -->
+              <div
+                v-if="cancelConfirming === order.id"
+                class="bg-red-50 border border-red-200 rounded-xl p-4"
+              >
+                <p class="text-sm font-bold text-red-700 mb-3">
+                  Siparişi iptal etmek istediğinizden emin misiniz?
+                </p>
+                <div class="flex gap-2">
+                  <button
+                    @click="cancelOrder(order.id)"
+                    :disabled="cancelling === order.id"
+                    class="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-bold text-sm
+                          hover:bg-red-600 transition-colors disabled:opacity-60"
+                  >
+                    {{ cancelling === order.id ? 'İptal ediliyor…' : 'Evet, İptal Et' }}
+                  </button>
+                  <button
+                    @click="abortCancel"
+                    class="flex-1 bg-white border border-stone-200 text-stone-600 py-2.5 rounded-xl font-bold text-sm hover:bg-stone-50 transition-colors"
+                  >
+                    Vazgeç
+                  </button>
+                </div>
+              </div>
+
+              <!-- İlk iptal butonu -->
+              <button
+                v-else
+                @click="confirmCancel(order.id)"
+                class="flex items-center gap-1.5 text-red-400 hover:text-red-600 text-sm font-bold transition-colors"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Siparişi İptal Et
+              </button>
+
+            </div>
+            <!--  -->
           </div>
         </div>
 

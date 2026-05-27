@@ -30,7 +30,12 @@ class PalletViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     
     # Frontend'in URL sonuna soru işareti (?) ile parametre ekleyebileceği alanlar
-    filterset_fields = ['status']
+    filterset_fields = {
+        'status': ['exact'],
+        'producer__org_code': ['exact'],       # Matches ?producer__org_code=ORG-123
+        'current_holder__org_code': ['exact'],
+        'destination_market__name': ['exact']
+    }
 
     def get_permissions(self):
         """
@@ -203,8 +208,7 @@ class PalletViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         organization = self.request.user.organization
         now = timezone.now()
-        today = datetime.date.today()
-        departure_date = today + datetime.timedelta(days=2)
+        departure_date = now + datetime.timedelta(days=2)
         # 1. GÜVENLİK DUVARI: Çiftliğin aktif bir sertifikası var mı?
         # valid_from bugünden küçük/eşit olmalı, valid_to bugünden büyük/eşit olmalı
         active_certificate = InspectionCertificate.objects.filter(
@@ -466,8 +470,7 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
                 "Üretim durduruldu: Çiftliğinize ait geçerli bir veteriner denetim sertifikası bulunamadı."
             )
         
-        today = datetime.date.today()
-        departure_date = today + datetime.timedelta(days=2)
+        departure_date = now + datetime.timedelta(days=2)
         # 2. Paleti Oluştur (Otomatik onaylı olarak)
         new_pallet = Pallet.objects.create(
             producer=producer_org,
@@ -491,17 +494,17 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
 
         # 4. Paketleri Oluştur
         packages_to_create = []
-        expiry = today + datetime.timedelta(days=28) 
+        expiry = now + datetime.timedelta(days=28) 
 
         for item in order.items.all():
             for _ in range(item.package_quantity):
-                generated_qr = f"PKG-{uuid.uuid4().hex[:6].upper()}"
+                generated_qr = f"PKG-{item.feeding_type}{item.capacity}{uuid.uuid4().hex[:7].upper()}"
                 package = Package(
                     package_qr_id=generated_qr,
                     pallet=new_pallet,
                     feeding_type=item.feeding_type,
                     capacity=item.capacity,
-                    laying_date=today,
+                    laying_date=now,
                     expiry_date=expiry
                 )
                 packages_to_create.append(package)
@@ -537,6 +540,32 @@ class MarketOrderViewSet(viewsets.ModelViewSet):
             "total_packages": total_packages,
             "certificate_used": active_certificate.certificate_no
         }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel_order(self, request, pk=None):
+        order = self.get_object()
+        user_org = request.user.organization
+
+        if order.status != 'ASSIGNED':
+            return Response(
+                {"error": "Yalnızca 'Atandı' durumundaki siparişler iptal edilebilir."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user_org.organization_type == 'MARKET':
+            if order.market != user_org:
+                raise PermissionDenied("Bu sipariş size ait değil.")
+        elif user_org.organization_type == 'PRODUCER':
+            if order.assigned_producer != user_org:
+                raise PermissionDenied("Bu sipariş size atanmamış.")
+        else:
+            raise PermissionDenied("Bu işlemi gerçekleştirme yetkiniz yok.")
+
+        order.status = 'CANCELLED'
+        order.assigned_producer = None  # Üreticiyi serbest bırak
+        order.save()
+
+        return Response({"message": "Sipariş iptal edildi."})
 
 class MarketOrderItemViewSet(viewsets.ModelViewSet):
     serializer_class = MarketOrderItemSerializer

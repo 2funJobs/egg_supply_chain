@@ -10,51 +10,55 @@
      Emits:   'created'  → payload: the new pallet object returned by the API
               'close'    → no payload; parent should hide the modal -->
 <script setup>
-import { ref, computed } from 'vue'
-import { pallets as palletsApi } from '../api'
+import { ref, computed, onMounted } from 'vue'
+import { pallets as palletsApi, organizations as orgsApi } from '../api'
 import { useAuthStore } from '../stores/auth'
 
 const emit = defineEmits(['created', 'close'])
 const auth = useAuthStore()
 
-const qrId = ref('')
 const isLoading = ref(false)
 const error = ref(null)
+// State
+const markets        = ref([])
+const selectedMarket = ref('')
+const marketsLoading = ref(false)
 
-// Validation: QR ID must be at least 3 non-whitespace characters.
-// computed() re-evaluates automatically whenever qrId changes.
-const isValid = computed(() => qrId.value.trim().length >= 3)
+const isValid = computed(() => !!selectedMarket.value)
 
-// Generate a timestamp-based ID so the user doesn't have to type one.
-const generateId = () => {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  qrId.value = `PAL-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
+// Market listesini çek (sadece MARKET tipindekiler)
+const fetchMarkets = async () => {
+  marketsLoading.value = true
+  try {
+    const res    = await orgsApi.list({ organization_type: 'MARKET' })
+    const data   = res.data
+    markets.value = Array.isArray(data) ? data : (data.results ?? [])
+  } catch {
+    error.value = 'Market listesi yüklenemedi.'
+  } finally {
+    marketsLoading.value = false
+  }
 }
 
+// handleCreate'e destination_market ekle
 const handleCreate = async () => {
-  if (!isValid.value || isLoading.value) return
-  error.value = null
+  if (!isValid.value) return
   isLoading.value = true
-
+  error.value = null
   try {
-    const res = await palletsApi.create({ master_qr_id: qrId.value.trim() })
-    // Tell the parent a pallet was created. The parent decides what to do next
-    // (refresh list, navigate to detail, show a toast, etc.)
-    emit('created', res.data)
+    const pallet = await palletsApi.create({
+      destination_market: selectedMarket.value,  // artık tek gönderilen alan
+    })
+    console.log("hello")
+    emit('created', pallet.data)
   } catch (err) {
-    // DRF often returns field errors as { field: ["message"] }
-    // Flatten them into a single string for display.
-    const data = err.response?.data
-    if (typeof data === 'object' && data !== null) {
-      error.value = Object.values(data).flat().join(' ')
-    } else {
-      error.value = 'Failed to create pallet. Check the server logs.'
-    }
+    error.value = err.response?.data?.detail ?? 'Failed to create pallet.'
   } finally {
     isLoading.value = false
   }
 }
+
+onMounted(fetchMarkets)
 </script>
 
 <template>
@@ -96,40 +100,41 @@ const handleCreate = async () => {
             ⚠️ {{ error }}
           </div>
 
-          <!-- QR ID field with auto-generate button -->
           <div>
-            <label class="block text-sm font-bold text-stone-700 mb-1.5">Pallet QR ID</label>
-            <div class="flex gap-2">
-              <input
-                v-model="qrId"
-                type="text"
-                placeholder="e.g. PAL-20240501-0830"
-                @keyup.enter="handleCreate"
-                class="flex-1 px-4 py-3 bg-stone-50 border rounded-xl font-mono text-sm
-                       transition-colors focus:outline-none
-                       focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                :class="qrId && !isValid ? 'border-red-300 bg-red-50' : 'border-stone-200'"
-              />
-              <button
-                type="button"
-                @click="generateId"
-                class="px-4 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs
-                       hover:bg-stone-200 transition-colors shrink-0"
-              >
-                Auto
-              </button>
-            </div>
-            <!-- Inline validation message — shows only when there's input but it's invalid -->
-            <p
-              v-if="qrId && !isValid"
-              class="text-xs text-red-500 mt-1.5 ml-1"
+          <label class="block text-sm font-bold text-stone-700 mb-1.5">
+            Destination Market
+          </label>
+
+          <!-- Yükleniyor -->
+          <div
+            v-if="marketsLoading"
+            class="h-12 bg-stone-50 border border-stone-200 rounded-xl animate-pulse"
+          />
+
+          <!-- Dropdown -->
+          <select
+            v-else
+            v-model="selectedMarket"
+            class="w-full px-4 py-3 bg-stone-50 border rounded-xl text-sm
+                  focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400
+                  transition-colors appearance-none"
+            :class="selectedMarket ? 'border-stone-200 text-stone-800' : 'border-stone-200 text-stone-400'"
+          >
+            <option value="" disabled>Select a market…</option>
+            <option
+              v-for="market in markets"
+              :key="market.org_code"
+              :value="market.org_code"
             >
-              At least 3 characters required.
-            </p>
-            <p v-else class="text-xs text-stone-400 mt-1.5 ml-1">
-              Must be unique across the network.
-            </p>
-          </div>
+              {{ market.name }}  ·  {{ market.org_code }}
+            </option>
+          </select>
+
+          <!-- Market bulunamadı uyarısı -->
+          <p v-if="!marketsLoading && markets.length === 0" class="text-xs text-amber-600 mt-1.5 ml-1">
+            ⚠️ No markets registered in the system yet.
+          </p>
+        </div>
 
           <!-- Producer auto-set info pill -->
           <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-3">

@@ -67,7 +67,7 @@ class Package(models.Model):
         # Koliler için otomatik QR üretimi
         if not self.package_qr_id:
             # Örn: PKG-E91D3F (Kutu barkodu)
-            self.package_qr_id = f"PKG-{uuid.uuid4().hex[:6].upper()}"
+            self.package_qr_id = f"PKG-{self.feeding_type}{self.capacity}{uuid.uuid4().hex[:7].upper()}"
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -89,7 +89,8 @@ class MarketOrder(models.Model):
         ('ASSIGNED', 'Assigned to Producer'),
         ('IN_PRODUCTION', 'Producer Preparing Pallet'),
         ('SHIPPED', 'Shipped'),
-        ('DELIVERED', 'Delivered')
+        ('DELIVERED', 'Delivered'),
+        ('CANCELLED', 'Cancelled'),
     ]
 
     market = models.ForeignKey("organizations.Organization", on_delete=models.CASCADE, related_name="placed_orders")

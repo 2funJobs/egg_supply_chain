@@ -95,6 +95,7 @@ export const orders = {
   list:     (params)  => api.get('/orders/', { params }),
   checkout: (id)      => api.post(`/orders/${id}/checkout/`),
   accept:   (id)      => api.post(`/orders/${id}/accept/`),
+  cancel: (id) => api.post(`/orders/${id}/cancel/`),
 }
 
 export const orderItems = {

@@ -24,7 +24,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             
         # 4. Görüntüleme (Listeleme/Detay) sadece admin ve denetleyici
         else:
-            permission_classes = [IsAdminUser | IsVet]
+            permission_classes = [IsAdminUser | IsVet | IsProducer]
             
         return [permission() for permission in permission_classes]
     
@@ -44,6 +44,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         # Eğer Inspector ise sadece PRODUCER listesiyle sınırla
         elif token_payload and token_payload.get('role') == 'INSPECTOR':
             queryset = queryset.filter(organization_type='PRODUCER')
+
+        elif token_payload and token_payload.get('role') == 'PRODUCER':
+            queryset = queryset.filter(organization_type='MARKET')
             
         # Tanımsız bir rol ise veya yetkisizse hiçbir şey gösterme
         else:

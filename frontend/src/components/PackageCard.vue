@@ -15,7 +15,7 @@ defineEmits(['click'])
   <div
     @click="$emit('click', package)"
     class="bg-white rounded-2xl border border-stone-100 shadow-sm
-           hover:shadow-md hover:border-amber-200 transition-all cursor-pointer"
+           hover:shadow-md hover:border-amber-200 transition-all"
   >
     <!-- Main row: icon + QR ID + status badge -->
     <div class="flex items-center gap-4 p-4">

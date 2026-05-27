@@ -17,6 +17,22 @@ const error         = ref(null)
 const activeTab     = ref('ASSIGNED')
 const accepting     = ref(null)      // order ID currently being accepted
 const acceptResults = ref({})        // { [orderId]: responseData }
+const cancelConfirming = ref(null)
+const cancelling       = ref(null)
+
+const cancelOrder = async (orderId) => {
+  cancelling.value       = orderId
+  cancelConfirming.value = null
+  try {
+    await ordersApi.cancel(orderId)
+    // Üretici reddettiğinde assigned_producer null olur → listeden düşer
+    allOrders.value = allOrders.value.filter(o => o.id !== orderId)
+  } catch (e) {
+    error.value = e.response?.data?.error || 'Sipariş reddedilemedi.'
+  } finally {
+    cancelling.value = null
+  }
+}
 
 const filtered = computed(() =>
   allOrders.value.filter(o => o.status === activeTab.value)
@@ -198,20 +214,54 @@ onMounted(fetchOrders)
             </div>
 
             <!-- Accept button -->
-            <button
-              v-else-if="order.status === 'ASSIGNED'"
-              @click="acceptOrder(order)"
-              :disabled="accepting === order.id"
-              class="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold text-sm
-                     hover:bg-orange-600 transition-colors disabled:opacity-60
-                     flex items-center justify-center gap-2"
+            <div
+              v-else-if="cancelConfirming === order.id"
+              class="bg-red-50 border border-red-200 rounded-xl p-4"
             >
-              <svg v-if="accepting !== order.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
-              {{ accepting === order.id ? 'İşleniyor…' : 'Siparişi Kabul Et' }}
-            </button>
+              <p class="text-sm font-bold text-red-700 mb-3">
+                Bu siparişi reddetmek istediğinizden emin misiniz?
+              </p>
+              <div class="flex gap-2">
+                <button
+                  @click="cancelOrder(order.id)"
+                  :disabled="cancelling === order.id"
+                  class="justify-center justify-items-center mx-auto w-50 bg-red-500 text-white py-2.5 rounded-xl font-bold text-sm
+                        hover:bg-red-600 transition-colors disabled:opacity-60"
+                >
+                  {{ cancelling === order.id ? 'Reddediliyor…' : 'Evet, Reddet' }}
+                </button>
+                <button
+                  @click="cancelConfirming = null"
+                  class="justify-center justify-items-center mx-auto w-50 bg-white border border-stone-200 text-stone-600 py-2.5 rounded-xl font-bold text-sm hover:bg-stone-50 transition-colors"
+                >
+                  Vazgeç
+                </button>
+              </div>
+            </div>
 
+            <!-- Kabul Et + Reddet butonları -->
+            <template v-else-if="order.status === 'ASSIGNED'">
+              <button
+                @click="acceptOrder(order)"
+                :disabled="accepting === order.id"
+                class="w-50 bg-orange-500 text-white py-3.5 rounded-xl font-bold text-sm
+                      hover:bg-orange-600 transition-colors disabled:opacity-60
+                      flex items-center justify-center gap-2"
+              >
+                <svg v-if="accepting !== order.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                {{ accepting === order.id ? 'İşleniyor…' : 'Siparişi Kabul Et' }}
+              </button>
+              <button
+                @click="cancelConfirming = order.id"
+                class="justify-center justify-items-center mx-auto w-50 mt-2 bg-white border-2 border-red-200 text-red-500 py-3 rounded-xl
+                      font-bold text-sm hover:bg-red-50 hover:border-red-300 transition-colors"
+              >
+                Reddet
+              </button>
+            </template>
+            <!--  -->
           </div>
         </div>
       </div>

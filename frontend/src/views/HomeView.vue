@@ -35,8 +35,14 @@ onMounted(async () => {
       }
     }
   try {
+    const palletQueryParams = {}
+
+    if (auth.user?.role === 'PRODUCER') {
+      palletQueryParams.producer__org_code = auth.user?.orgCode
+    }
+
     const [palletsRes, logsRes] = await Promise.all([
-      palletsApi.list(),
+      palletsApi.list(palletQueryParams),
       blockchainApi.list(),
     ])
     const pd = palletsRes.data

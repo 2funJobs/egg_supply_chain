@@ -1,13 +1,19 @@
 from rest_framework import serializers
 from .models import Pallet, Package, MarketOrder, MarketOrderItem
 from organizations.serializers import OrganizationSerializer
-
+from organizations.models import Organization
 class PalletSerializer(serializers.ModelSerializer):
     producer_detail = OrganizationSerializer(source="producer", read_only=True)
     current_holder_detail = OrganizationSerializer(source="current_holder", read_only=True)
 
     producer = serializers.SlugRelatedField(slug_field='org_code', read_only=True)
     current_holder = serializers.SlugRelatedField(slug_field='org_code', read_only=True)
+    destination_market = serializers.SlugRelatedField(
+        slug_field='org_code',
+        queryset=Organization.objects.filter(organization_type='MARKET'),
+        required=False,
+        allow_null=True
+    )
     destination_market_detail = OrganizationSerializer(
         source='destination_market',
         read_only=True
@@ -24,7 +30,7 @@ class PalletSerializer(serializers.ModelSerializer):
         ]
         
         # Bu alanları read_only yaparsak, DRF artık POST isteğinde bu verileri kullanıcıdan beklemez.
-        read_only_fields = ['producer', 'current_holder', 'status', 'vet_approval', 'is_quality_maintained']
+        read_only_fields = ['producer', 'current_holder', 'departure_date', 'status', 'vet_approval', 'is_quality_maintained']
 
 # Blockchain loglarini gostermek icin kullanilan serializer tanimidir.
 

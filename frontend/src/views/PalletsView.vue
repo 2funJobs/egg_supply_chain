@@ -5,9 +5,12 @@ import { pallets as palletsApi } from '../api'
 import { usePermissions } from '../composables/usePermissions'
 import PalletCard from '../components/PalletCard.vue'
 import CreatePalletModal from '../components/CreatePalletModal.vue'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
 const { canCreatePallet, canTransferPallet } = usePermissions()
+
 
 const allPallets    = ref([])
 const loading       = ref(true)
@@ -52,10 +55,20 @@ const onPalletCreated = (newPallet) => {
   router.push(`/pallets/${newPallet.master_qr_id}`)
 }
 
+
+
 onMounted(async () => {
   try {
-    const res = await palletsApi.list()
-    allPallets.value = Array.isArray(res.data) ? res.data : (res.data.results ?? [])
+    const palletQueryParams = {}
+
+    if (auth.user?.role === 'PRODUCER') {
+      palletQueryParams.producer__org_code = auth.user?.orgCode
+    }
+
+    const [palletsRes] = await Promise.all([
+      palletsApi.list(palletQueryParams),
+    ])
+    allPallets.value = Array.isArray(palletsRes.data) ? palletsRes.data : (palletsRes.data.results ?? [])
   } catch {
     error.value = 'Failed to load pallets. Is the Django server running?'
   } finally {

@@ -224,11 +224,17 @@ onMounted(loadData)
               <p class="text-sm font-bold text-stone-800 truncate">
                 {{ pallet.producer?.name || pallet.producer || '—' }}
               </p>
+              <p class="text-sm font-bold text-stone-800 truncate">
+                {{ pallet.producer_detail?.name }}
+              </p>
             </div>
             <div class="bg-stone-50 rounded-xl p-3">
               <p class="text-xs text-stone-400 mb-1">Current Holder</p>
               <p class="text-sm font-bold text-stone-800 truncate">
                 {{ pallet.current_holder?.name || pallet.current_holder || 'Producer' }}
+              </p>
+              <p class="text-sm font-bold text-stone-800 truncate">
+                {{ pallet.current_holder_detail?.name }}
               </p>
             </div>
             <div class="bg-stone-50 rounded-xl p-3">
@@ -238,6 +244,11 @@ onMounted(loadData)
             <div class="bg-stone-50 rounded-xl p-3">
               <p class="text-xs text-stone-400 mb-1">Departure</p>
               <p class="text-sm font-bold text-stone-800">{{ formatDate(pallet.departure_date) }}</p>
+            </div>
+            <div class="bg-stone-50 rounded-xl p-3">
+              <p class="text-xs text-stone-400 mb-1">Hedef Market</p>
+              <p class="text-sm font-bold text-stone-800">{{ pallet.destination_market_detail.org_code }}</p>
+              <p class="text-sm font-bold text-stone-800">{{ pallet.destination_market_detail.name }}</p>
             </div>
           </div>
         </div>

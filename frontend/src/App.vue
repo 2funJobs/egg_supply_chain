@@ -55,7 +55,7 @@ const handleLogout = () => {
            The :class binding applies styles based on whether the route is active. -->
       <RouterLink
         to="/"
-        class="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:w-full
+        class="flex flex-col md:flex-row items-center order-1 md:order-none gap-1 md:gap-3 md:w-full
                md:px-4 md:py-3 md:rounded-xl transition-colors px-4 py-1.5"
         :class="isActive('/')
           ? 'text-amber-600 md:bg-amber-50'
@@ -70,7 +70,7 @@ const handleLogout = () => {
 
       <RouterLink v-if="canCreatePallet || canTransferPallet"
         to="/pallets"
-        class="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:w-full
+        class="flex flex-col md:flex-row items-center order-2 md:order-none gap-1 md:gap-3 md:w-full
                md:px-4 md:py-3 md:rounded-xl transition-colors px-4 py-1.5"
         :class="isActive('/pallets')
           ? 'text-amber-600 md:bg-amber-50'
@@ -86,7 +86,7 @@ const handleLogout = () => {
       <RouterLink
         v-if="canViewOrders"
         :to="isMarket ? '/orders' : '/producer-orders'"
-        class="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:w-full
+        class="flex flex-col md:flex-row items-center order-4 md:order-none gap-1 md:gap-3 md:w-full
               md:px-4 md:py-3 md:rounded-xl transition-colors px-4 py-1.5"
         :class="isActive('/orders')
           ? 'text-amber-600 md:bg-amber-50'
@@ -100,9 +100,9 @@ const handleLogout = () => {
       </RouterLink>
 
       <RouterLink
-        v-if="canViewPackages"
+        v-if="auth.user?.role === 'PRODUCER'"
         to="/packages"
-        class="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:w-full
+        class="flex flex-col md:flex-row items-center order-5 md:order-none gap-1 md:gap-3 md:w-full
                md:px-4 md:py-3 md:rounded-xl transition-colors px-4 py-1.5"
         :class="isActive('/packages')
           ? 'text-amber-600 md:bg-amber-50'
@@ -117,7 +117,7 @@ const handleLogout = () => {
 
       <RouterLink
         to="/ledger"
-        class="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:w-full
+        class="flex flex-col md:flex-row items-center order-6 md:order-none gap-1 md:gap-3 md:w-full
                md:px-4 md:py-3 md:rounded-xl transition-colors px-4 py-1.5"
         :class="isActive('/ledger')
           ? 'text-amber-600 md:bg-amber-50'
@@ -131,11 +131,11 @@ const handleLogout = () => {
       </RouterLink>
 
       <!-- The QR Scan button floats up on mobile (classic mobile FAB pattern) -->
-      <div class="relative flex flex-col items-center">
+      <div class="relative flex flex-col items-center order-4 md:order-none">
         <RouterLink
           to="/scan"
           class="relative -top-5 md:static md:mt-2 md:w-full
-                 bg-amber-600 text-white p-4 md:py-3 md:px-4 rounded-full md:rounded-xl
+                 bg-amber-600 text-white p-10 md:py-3 md:px-4 rounded-full md:rounded-xl
                  shadow-lg flex items-center justify-center gap-2
                  hover:bg-amber-700 transition-colors"
         >
@@ -148,8 +148,22 @@ const handleLogout = () => {
           </svg>
           <span class="hidden md:inline font-bold text-sm">Scan QR</span>
         </RouterLink>
-        <span class="text-[10px] font-semibold text-stone-500 mt-1 md:hidden">Scan QR</span>
       </div>
+      <!-- Profile — mobile nav only -->
+      <RouterLink
+        to="/profile"
+        class="flex flex-col items-center gap-1 order-7 md:hidden px-4 py-1.5 transition-colors"
+        :class="isActive('/profile')
+          ? 'text-amber-600'
+          : 'text-stone-400 hover:text-amber-500'"
+      >
+        <!-- Avatar circle with initial -->
+        <div class="w-6 h-6 rounded-full p-4 bg-amber-200 flex items-center justify-center
+                    text-amber-700 font-black text-xs shrink-0">
+          {{ auth.user?.orgName?.charAt(0) || 'U' }}
+        </div>
+        <span class="text-[10px] font-semibold">Profile</span>
+      </RouterLink>
 
       <!-- User info + logout — desktop sidebar only -->
       <div class="hidden md:flex flex-col gap-2 w-full mt-auto pt-6 border-t border-stone-100">

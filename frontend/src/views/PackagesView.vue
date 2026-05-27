@@ -1,13 +1,15 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { packages as packagesApi } from '../api' // Removed palletsApi as it's unused here
+import { packages as packagesApi, pallets as palletsApi } from '../api' 
 import { usePermissions } from '../composables/usePermissions'
+import { useAuthStore } from '../stores/auth'
 import PackagesCard from '../components/PackageCard.vue'
 import CreatePackageModal from '../components/CreatePackageModal.vue'
 
 const router = useRouter()
 const { canCreatePallet } = usePermissions()
+const auth = useAuthStore()
 
 const allPackages   = ref([])
 const loading       = ref(true)
@@ -16,7 +18,6 @@ const activeFilter  = ref('ALL')
 const searchQuery   = ref('')
 const showModal     = ref(false)
 
-// 1. Add the exact same filter tabs you use for Pallets
 const filters = [
   { label: 'All',           value: 'ALL' },
   { label: 'In Production', value: 'IN_PRODUCTION' },
@@ -25,21 +26,16 @@ const filters = [
   { label: 'Faulty',        value: 'FAULTY' },
 ]
 
-// 2. Update the computed property to look inside pallet_detail
 const filteredPackages = computed(() => {
   let result = allPackages.value
   
-  // Apply status filter (reading from the Master Pallet's status!)
   if (activeFilter.value !== 'ALL') {
     result = result.filter((p) => p.pallet_detail?.status === activeFilter.value)
   }
-  
-  // Apply search text filter
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter((p) => p.package_qr_id?.toLowerCase().includes(query))
   }
-  
   return result
 })
 
@@ -56,18 +52,58 @@ const onPackageCreated = (newPackage) => {
   router.push(`/packages/${newPackage.package_qr_id}`)
 }
 
-onMounted(async () => {
+// 1. Moved the fetching logic into its own function so we can control exactly WHEN it runs
+const fetchData = async (userOrg) => {
+  loading.value = true
+  
   try {
-    const res = await packagesApi.list()
-    // FIXED: Assigned to allPackages, not allPallets
-    allPackages.value = Array.isArray(res.data) ? res.data : (res.data.results ?? [])
+    // 2. Changed parameters to 'producer' instead of 'producer__org_code'
+    const [pkgRes, palletRes] = await Promise.all([
+      packagesApi.list({ pallet__producer: userOrg }), 
+      palletsApi.list({ producer: userOrg }) 
+    ])
 
-    console.log("PACKAGE DATA:", allPackages.value[0])
+    let rawPackages = Array.isArray(pkgRes.data) ? pkgRes.data : (pkgRes.data.results ?? [])
+    let rawPallets = Array.isArray(palletRes.data) ? palletRes.data : (palletRes.data.results ?? [])
 
-} catch {
-    error.value = 'Failed to load packages. Is the Django server running?'
+    // 3. FRONTEND SAFETY FILTER (The Ultimate Backup)
+    // If Django ignores our parameters and sends everything, Vue will delete the rest here.
+    rawPallets = rawPallets.filter(pallet => pallet.producer === userOrg)
+
+    const palletsDict = {}
+    rawPallets.forEach(pallet => {
+      palletsDict[pallet.master_qr_id] = pallet 
+    })
+
+    // 4. Map the packages, but ONLY keep packages that successfully found a matching pallet
+    const mappedPackages = rawPackages.map(pkg => ({
+      ...pkg,
+      pallet_detail: palletsDict[pkg.pallet] || null 
+    }))
+    
+    // Filter out any packages where the pallet wasn't found (meaning it belonged to another producer)
+    allPackages.value = mappedPackages.filter(pkg => pkg.pallet_detail !== null)
+
+  } catch (err) {
+    console.error(err)
+    error.value = 'Failed to load data. Is the Django server running?'
   } finally {
     loading.value = false
+  }
+}
+
+onMounted(() => {
+  // 5. Check if auth exists immediately
+  if (auth.user?.orgCode) {
+    fetchData(auth.user.orgCode)
+  } else {
+    // If it doesn't exist yet, wait for the auth store to finish loading, then fetch!
+    const unwatch = watch(() => auth.user?.orgCode, (newOrgCode) => {
+      if (newOrgCode) {
+        fetchData(newOrgCode)
+        unwatch() // Stop watching once we have the data
+      }
+    })
   }
 })
 </script>
@@ -155,25 +191,26 @@ onMounted(async () => {
           v-for="_package in filteredPackages"
           :key="_package.package_qr_id"
           :package="_package"
-          @click="router.push(`/packages/${_package.package_qr_id}`)" 
         >
           <!-- FIXED: Replaced "package.package_qr_id" with "_package.package_qr_id" above -->
 
           <template #footer>
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-4 text-xs text-stone-500">
-              <span class="flex items-center gap-1.5">
-                <!-- FIXED: Changed "_package,pallet" to "_package.pallet?." to prevent crashes if pallet is null -->
-                <span class="w-2 h-2 rounded-full"
-                      :class="_package.pallet_detail?.vet_approval ? 'bg-emerald-400' : 'bg-stone-300'"></span>
-                Vet {{ _package.pallet_detail?.vet_approval ? 'Approved' : 'Pending' }}
+              <span class="font-bold flex items-center gap-1.5">
+                İlgili Palet: <p class="text-s font-medium text-stone-800"> {{ _package.pallet }}</p>
               </span>
-              <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full"
-                      :class="_package.pallet_detail?.is_quality_maintained ? 'bg-emerald-400' : 'bg-stone-300'"></span>
-                Quality {{ _package.pallet_detail?.is_quality_maintained ? 'OK' : 'Unknown' }}
+              <span class="font-bold flex items-center gap-1.5">
+                Yumurtlama Tarihi: <p class="text-s font-medium text-stone-800"> {{ _package.laying_date }}</p>
               </span>
-              <span v-if="_package.pallet_detail?.created_at" class="ml-auto text-stone-400">
-                {{ formatDate(_package.pallet_detail.created_at) }}
+              <span class="font-bold flex items-center gap-1.5">
+                <button 
+                  @click="router.push(`/packages/${_package.package_qr_id}`)" 
+                  class="text-s font-medium text-stone-200 bg-amber-600 p-2 md:py-3 md:px-4 rounded-full md:rounded-xl
+                  shadow-lg flex items-center justify-center gap-2
+                  hover:bg-amber-700 transition-colors cursor-pointer"
+                  >
+                Detay
+                </button>
               </span>
             </div>
           </template>
