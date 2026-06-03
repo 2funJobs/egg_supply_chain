@@ -32,7 +32,7 @@ defineEmits(['click'])
            hover:shadow-md hover:border-amber-200 transition-all cursor-pointer"
   >
     <!-- Main row: icon + QR ID + status badge -->
-    <div class="flex items-center gap-4 p-4">
+    <div class="flex items-center gap-4 p-4 cursor-text">
       <div class="bg-amber-50 p-3 rounded-xl text-xl shrink-0">📦</div>
       <div class="min-w-0 flex-1">
         <p class="font-black text-stone-800 font-mono text-sm truncate">

@@ -12,6 +12,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePermissions } from '../composables/usePermissions'
 import { pallets as palletsApi, packages as packagesApi, blockchain as blockchainApi } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
+import QrcodeVue from 'qrcode.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -135,6 +136,32 @@ const submitTransfer = async () => {
   }
 }
 
+const downloadQR = () => {
+  const wrapper = document.getElementById('qr-wrapper')
+  
+  if (!wrapper) {
+    console.error('QR Wrapper div not found.')
+    return
+  }
+
+  const canvas = wrapper.querySelector('canvas')
+  if (!canvas) {
+    console.error('Actual canvas element not found inside the wrapper.')
+    return
+  }
+  
+  const imageUrl = canvas.toDataURL('image/png')
+  const downloadLink = document.createElement('a')
+  
+  downloadLink.href = imageUrl
+  // Uses the reactive route parameter to name the file perfectly
+  downloadLink.download = `Pallet-${qrId.value}.png`
+  
+  document.body.appendChild(downloadLink)
+  downloadLink.click()
+  document.body.removeChild(downloadLink)
+}
+
 // watch() — runs the callback whenever qrId changes.
 // This handles the case where the user navigates from one pallet detail to another
 // (e.g., going back to the list and clicking a different pallet).
@@ -150,7 +177,7 @@ onMounted(loadData)
     <!-- ============================================================
          HEADER
          ============================================================ -->
-    <div class="bg-gradient-to-br from-amber-600 to-orange-800 pt-10 pb-8 px-6 rounded-b-[32px] shadow-lg">
+    <div class="bg-gradient-to-br from-stone-700 to-stone-900 pt-10 pb-8 px-6 rounded-b-[32px] shadow-lg">
 
       <!-- Back button + title -->
       <div class="flex items-center gap-3 mb-5">
@@ -167,7 +194,7 @@ onMounted(loadData)
           <h1 class="text-white font-black font-mono text-lg truncate">{{ qrId }}</h1>
         </div>
       </div>
-
+      <!--  -->
       <!-- Status row -->
       <div v-if="pallet && !loading" class="flex items-center gap-3 flex-wrap">
         <StatusBadge :status="pallet.status" variant="pallet" />
@@ -190,8 +217,9 @@ onMounted(loadData)
         <div class="h-7 w-28 bg-white/20 rounded-full animate-pulse"></div>
         <div class="h-7 w-24 bg-white/20 rounded-full animate-pulse"></div>
       </div>
-    </div>
 
+    </div>
+    
     <!-- ============================================================
          CONTENT
          ============================================================ -->
@@ -216,6 +244,30 @@ onMounted(loadData)
       <template v-if="pallet && !loading">
 
         <!-- ── INFO GRID ─────────────────────────────────────────── -->
+        <!--  -->
+        <div v-if="!loading && !error" class="flex flex-col items-center gap-3 bg-gray-50 p-2 rounded-xl border border-gray-100 w-fit m-2">
+          
+          <div id="qr-wrapper" class="w-29 h-29 shrink-0 bg-white p-2 rounded-xl shadow-sm flex justify-center items-center">
+            <qrcode-vue 
+              :value="qrId" 
+              :size="100" 
+              level="H" 
+              render-as="canvas"
+              class="rounded"
+            />
+          </div>
+
+          <button 
+            @click="downloadQR" 
+            class="w-full flex justify-center items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-amber-700 transition-colors text-sm font-medium cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            QR İndir
+          </button>
+        </div>
+        <!--  -->
         <div class="bg-white rounded-2xl p-5 border border-stone-100 shadow-sm">
           <h3 class="text-xs font-black text-stone-400 uppercase tracking-widest mb-4">Details</h3>
           <div class="grid grid-cols-2 gap-3">

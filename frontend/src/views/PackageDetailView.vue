@@ -3,12 +3,18 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { packages as packagesApi } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
+import QrcodeVue from 'qrcode.vue'
 
 const route  = useRoute()
 const router = useRouter()
 
 // Automatically updates if the route parameter changes
 // Make sure this matches your router config (e.g., /packages/:qrId)
+const qrValue = computed(() => {
+  // Generates: http://localhost:5173/scan?id=PKG-A6609C
+  // window.location.origin dynamically grabs the current domain/port
+  return `${window.location.origin}/scan?id=${qrId.value}`
+})
 const qrId = computed(() => route.params.qrId || route.params.id)
 
 // --- Page state ---
@@ -78,6 +84,32 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const downloadQR = () => {
+  const wrapper = document.getElementById('qr-wrapper')
+  
+  if (!wrapper) {
+    console.error('QR Wrapper div not found.')
+    return
+  }
+
+  const canvas = wrapper.querySelector('canvas')
+  if (!canvas) {
+    console.error('Actual canvas element not found inside the wrapper.')
+    return
+  }
+  
+  const imageUrl = canvas.toDataURL('image/png')
+  const downloadLink = document.createElement('a')
+  
+  downloadLink.href = imageUrl
+  // Uses the reactive route parameter to name the file perfectly
+  downloadLink.download = `Pallet-${qrId.value}.png`
+  
+  document.body.appendChild(downloadLink)
+  downloadLink.click()
+  document.body.removeChild(downloadLink)
 }
 
 // Re-fetch data if the user navigates directly to another package ID
@@ -157,7 +189,31 @@ onMounted(loadData)
       </template>
 
       <template v-if="pkg && !loading">
+        <!--  -->
+        <div v-if="!loading && !error" class="flex flex-col items-center gap-3 bg-gray-50 p-2 rounded-xl border border-gray-100 w-fit m-2">
+          
+          <div id="qr-wrapper" class="w-29 h-29 shrink-0 bg-white p-2 rounded-xl shadow-sm flex justify-center items-center">
+            <div v-if="!loading" class="w-29 h-29 shrink-0 bg-white p-2 rounded-xl shadow-md">
+            <qrcode-vue 
+              :value="qrValue" 
+              :size="100" 
+              level="H" 
+              class="rounded"
+            />
+            </div>
+          </div>
 
+          <button 
+            @click="downloadQR" 
+            class="w-full flex justify-center items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-amber-700 transition-colors text-sm font-medium cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            QR İndir
+          </button>
+        </div>
+        <!--  -->
         <!-- ── PACKAGE SPECS GRID ────────────────────────────────── -->
         <div class="bg-white rounded-2xl p-5 border border-stone-100 shadow-sm">
           <h3 class="text-xs font-black text-stone-400 uppercase tracking-widest mb-4 flex items-center gap-2">

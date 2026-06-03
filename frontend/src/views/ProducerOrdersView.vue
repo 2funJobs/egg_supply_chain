@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { orders as ordersApi } from '../api'
+import Qrcode from 'qrcode.vue'
 
 const EGG_EMOJI = { 0: '🌿', 1: '🌾', 2: '🏠', 3: '🔒' }
 
@@ -81,6 +82,29 @@ const acceptOrder = async (order) => {
   } finally {
     accepting.value = null
   }
+}
+
+// Download logic with dynamic targeting
+const downloadQR = (qrValue) => {
+  // Target the specific canvas using the dynamically generated ID
+  const canvasId = `pallet-qr-canvas-${qrValue}`
+  const canvas = document.getElementById(canvasId)
+  
+  if (!canvas) {
+    console.error(`QR Code canvas not found for ID: ${canvasId}`)
+    return
+  }
+
+  // Convert canvas to image and trigger download
+  const imageUrl = canvas.toDataURL('image/png')
+  const downloadLink = document.createElement('a')
+  
+  downloadLink.href = imageUrl
+  downloadLink.download = `Pallet-${qrValue}.png`
+  
+  document.body.appendChild(downloadLink)
+  downloadLink.click()
+  document.body.removeChild(downloadLink)
 }
 
 onMounted(fetchOrders)

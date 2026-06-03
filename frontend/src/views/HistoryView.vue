@@ -8,7 +8,8 @@
        - Conditional blocks with v-if / v-else-if / v-else
        - CSS-only vertical timeline using relative/absolute positioning -->
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { packages as packagesApi } from '../api'
 
 // ── Sabitler ──────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ const history        = ref(null)
 const loading        = ref(false)
 const error          = ref(null)
 const copiedHash     = ref(null)
-
+const route  = useRoute()
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
 
 const formatDate = (str, short = false) => {
@@ -71,6 +72,17 @@ const copyHash = async (hash) => {
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
+
+onMounted(() => {
+  // 1. Check if the URL has an ?id= parameter
+  if (route.query.id) {
+    // 2. Set the input value to the ID from the URL
+    qrInput.value = route.query.id
+    
+    // 3. Automatically trigger your existing search function
+    handleSearch()
+  }
+})
 
 const handleSearch = async () => {
   const id = qrInput.value.trim().toUpperCase()

@@ -164,10 +164,9 @@ onMounted(async () => {
           v-for="pallet in filteredPallets"
           :key="pallet.master_qr_id"
           :pallet="pallet"
-          @click="router.push(`/pallets/${pallet.master_qr_id}`)"
         >
           <template #footer>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-4 text-xs text-stone-500">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-4 text-xs text-stone-500 cursor-default">
               <span class="flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full"
                       :class="pallet.vet_approval ? 'bg-emerald-400' : 'bg-stone-300'"></span>
@@ -180,6 +179,16 @@ onMounted(async () => {
               </span>
               <span v-if="pallet.created_at" class="ml-auto text-stone-400">
                 {{ formatDate(pallet.created_at) }}
+              </span>
+              <span class="font-bold flex items-center gap-1.5">
+                <button 
+                  @click="router.push(`/pallets/${pallet.master_qr_id}`)" 
+                  class="text-s font-medium text-stone-200 bg-amber-600 p-2 md:py-3 md:px-4 rounded-full md:rounded-xl
+                  shadow-lg flex items-center justify-center gap-2
+                  hover:bg-amber-700 transition-colors cursor-pointer"
+                  >
+                Detay
+                </button>
               </span>
             </div>
           </template>
