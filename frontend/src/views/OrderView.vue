@@ -204,7 +204,7 @@ onMounted(fetchCart)
       <div class="flex">
         <button
           @click="activeView = 'cart'"
-          class="flex-1 py-3 text-sm font-bold transition-colors border-b-2"
+          class="flex-1 py-3 text-sm font-bold transition-colors border-b-2 hover:cursor-pointer"
           :class="activeView === 'cart'
             ? 'border-white text-white'
             : 'border-transparent text-orange-200 hover:text-white'"
@@ -213,7 +213,7 @@ onMounted(fetchCart)
         </button>
         <button
           @click="activeView = 'history'"
-          class="flex-1 py-3 text-sm font-bold transition-colors border-b-2 flex items-center justify-center gap-2"
+          class="flex-1 py-3 text-sm font-bold transition-colors border-b-2 flex items-center justify-center gap-2 hover:cursor-pointer"
           :class="activeView === 'history'
             ? 'border-white text-white'
             : 'border-transparent text-orange-200 hover:text-white'"
@@ -278,7 +278,7 @@ onMounted(fetchCart)
               v-for="egg in EGG_TYPES"
               :key="egg.value"
               @click="openSelector(egg)"
-              class="text-left rounded-2xl p-5 border-2 transition-all active:scale-95 hover:shadow-md"
+              class="text-left rounded-2xl p-5 border-2 transition-all active:scale-95 hover:shadow-md hover:cursor-pointer"
               :class="[egg.bg, egg.border]"
             >
               <div class="text-3xl mb-2">{{ egg.emoji }}</div>
@@ -478,7 +478,7 @@ onMounted(fetchCart)
               <button
                 v-else
                 @click="confirmCancel(order.id)"
-                class="flex items-center gap-1.5 text-red-400 hover:text-red-600 text-sm font-bold transition-colors"
+                class="flex items-center gap-1.5 text-red-50 hover:text-red-50 text-sm font-bold transition-colors bg-red-500 p-2 rounded-xl border-2 hover:cursor-pointer hover:bg-red-700"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>

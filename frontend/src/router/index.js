@@ -69,6 +69,12 @@ const routes = [
     component: () => import('../views/HistoryView.vue'),
     // No requiresAuth — this page is public so consumers can scan QR codes
   },
+    {
+    path: '/transfer',
+    name: 'transfer',
+    component: () => import('../views/TransferPalletsView.vue'),
+    // No requiresAuth — this page is public so consumers can scan QR codes
+  },
   {
   path: '/orders',
   name: 'orders',

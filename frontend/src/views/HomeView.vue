@@ -136,7 +136,7 @@ onMounted(async () => {
           <button @click="router.push('/pallets')"
             class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col
                    items-center gap-2.5 hover:shadow-md hover:border-amber-200 transition-all active:scale-95">
-            <div class="bg-amber-50 text-amber-600 p-3 rounded-xl">
+            <div class="bg-amber-50 text-amber-600 p-3 rounded-xl hover:cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
@@ -145,10 +145,10 @@ onMounted(async () => {
             <span class="text-xs font-bold text-stone-700">Pallets</span>
           </button>
 
-          <button @click="router.push('/scan')"
+          <button v-if="auth.user?.role === 'PRODUCER'" @click="router.push('/scan')"
             class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col
                    items-center gap-2.5 hover:shadow-md hover:border-emerald-200 transition-all active:scale-95">
-            <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl">
+            <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl hover:cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01
@@ -166,7 +166,7 @@ onMounted(async () => {
             @click="router.push('/pallets')"
             class="bg-amber-600 rounded-2xl p-4 shadow-sm flex flex-col
                    items-center gap-2.5 hover:bg-amber-700 transition-all active:scale-95">
-            <div class="bg-white/20 text-white p-3 rounded-xl">
+            <div class="bg-white/20 text-white p-3 rounded-xl hover:cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
@@ -179,7 +179,7 @@ onMounted(async () => {
             @click="router.push('/packages')"
             class="bg-amber-600 rounded-2xl p-4 shadow-sm flex flex-col
                    items-center gap-2.5 hover:bg-amber-700 transition-all active:scale-95">
-            <div class="bg-white/20 text-white p-3 rounded-xl">
+            <div class="bg-white/20 text-white p-3 rounded-xl hover:cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
@@ -192,7 +192,7 @@ onMounted(async () => {
             @click="router.push('/ledger')"
             class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col
                    items-center gap-2.5 hover:shadow-md hover:border-purple-200 transition-all active:scale-95">
-            <div class="bg-purple-50 text-purple-600 p-3 rounded-xl">
+            <div class="bg-purple-50 text-purple-600 p-3 rounded-xl hover:cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
@@ -203,10 +203,10 @@ onMounted(async () => {
           <!-- DISTRIBUTOR / MARKET only: transfer pallets -->
           <button
             v-if="canTransferPallet"
-            @click="router.push('/pallets')"
+            @click="router.push('/transfer')"
             class="bg-stone-700 rounded-2xl p-4 shadow-sm flex flex-col
                    items-center gap-2.5 hover:bg-stone-800 transition-all active:scale-95">
-            <div class="bg-white/20 text-white p-3 rounded-xl">
+            <div class="bg-white/20 text-white p-3 rounded-xl hover:cursor-pointer">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
@@ -222,8 +222,8 @@ onMounted(async () => {
       <div>
         <div class="flex justify-between items-center mb-3">
           <h3 class="text-xs font-black text-stone-400 uppercase tracking-widest">Recent Pallets</h3>
-          <button @click="router.push('/pallets')" class="text-xs font-bold text-amber-600 hover:text-amber-700">
-            See all →
+          <button @click="router.push('/pallets')" class="text-xs font-bold text-amber-600 hover:text-amber-700 hover:cursor-pointer">
+            Tümünü Gör →
           </button>
         </div>
 

@@ -11,13 +11,14 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { packages as packagesApi } from '../api'
+import { QrcodeStream } from 'vue-qrcode-reader'
 
 // ── Sabitler ──────────────────────────────────────────────────────────────────
 
 const FEEDING_TYPES = {
-  0: { label: 'Organic',    emoji: '🌿', bg: 'bg-emerald-50', color: 'text-emerald-700' },
+  0: { label: 'Organik',    emoji: '🌿', bg: 'bg-emerald-50', color: 'text-emerald-700' },
   1: { label: 'Free-Range', emoji: '🌾', bg: 'bg-amber-50',   color: 'text-amber-700'   },
-  2: { label: 'Barn',       emoji: '🏠', bg: 'bg-orange-50',  color: 'text-orange-700'  },
+  2: { label: 'Kümes',       emoji: '🏠', bg: 'bg-orange-50',  color: 'text-orange-700'  },
   3: { label: 'Cage',       emoji: '🔒', bg: 'bg-stone-50',   color: 'text-stone-700'   },
 }
 
@@ -40,6 +41,11 @@ const loading        = ref(false)
 const error          = ref(null)
 const copiedHash     = ref(null)
 const route  = useRoute()
+
+// --- Scanner State ---
+const showScanner = ref(false)
+const cameraError = ref(null)
+
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
 
 const formatDate = (str, short = false) => {
@@ -84,6 +90,51 @@ onMounted(() => {
   }
 })
 
+// --- Handle Camera Scan ---
+const onDetect = (detectedCodes) => {
+  const result = detectedCodes[0]
+  if (!result || !result.rawValue) return
+
+  const scannedText = result.rawValue
+  let finalId = scannedText
+
+  // Check if the scanned text is a full URL. If so, extract the 'id' parameter.
+  try {
+    const url = new URL(scannedText)
+    if (url.searchParams.has('id')) {
+      finalId = url.searchParams.get('id')
+    }
+  } catch (e) {
+    // If it's not a URL, it will fail silently and just use the raw text (fallback)
+  }
+
+  // Update input, hide scanner, and trigger search
+  qrInput.value = finalId
+  showScanner.value = false
+  handleSearch()
+}
+
+// --- Camera Error Handling ---
+const onCameraError = (err) => {
+  if (err.name === 'NotAllowedError') {
+    cameraError.value = 'Camera access was denied.'
+  } else if (err.name === 'NotFoundError') {
+    cameraError.value = 'No camera found on this device.'
+  } else {
+    cameraError.value = `Camera error: ${err.message}`
+  }
+}
+
+// --- Drawing Box on Scanner ---
+const paintBoundingBox = (detectedCodes, ctx) => {
+  for (const detectedCode of detectedCodes) {
+    const { boundingBox: { x, y, width, height } } = detectedCode
+    ctx.lineWidth = 3
+    ctx.strokeStyle = '#10b981' // emerald-500
+    ctx.strokeRect(x, y, width, height)
+  }
+}
+
 const handleSearch = async () => {
   const id = qrInput.value.trim().toUpperCase()
   if (!id) return
@@ -92,6 +143,7 @@ const handleSearch = async () => {
   history.value        = null
   packageDetails.value = null
   loading.value        = true
+  cameraError.value    = null
 
   try {
     const { data }       = await packagesApi.history(id)
@@ -120,7 +172,19 @@ const handleSearch = async () => {
       <p class="text-emerald-200 text-sm mb-6">
         Enter a package QR ID to see its complete journey from farm to table.
       </p>
+      <!-- INPUT -->
       <div class="flex gap-2">
+        <button 
+          @click="showScanner = !showScanner"
+          class="bg-white/20 hover:bg-white/30 text-white p-3.5 rounded-xl transition-colors shrink-0 flex items-center justify-center border border-white/30 backdrop-blur-sm"
+          title="Scan QR Code"
+        >
+          <!-- Camera SVG Icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
         <input
           v-model="qrInput"
           @keyup.enter="handleSearch"
@@ -140,6 +204,32 @@ const handleSearch = async () => {
           {{ loading ? '…' : 'Trace' }}
         </button>
       </div>
+      <!--  -->
+      <!-- Scanner Dropdown Area -->
+      <div 
+        v-if="showScanner" 
+        class="mt-4 bg-black/40 backdrop-blur-md rounded-xl p-3 border border-white/20 overflow-hidden shadow-inner"
+      >
+        <div class="flex justify-between items-center mb-2 px-1">
+          <span class="text-xs font-semibold text-emerald-100 uppercase tracking-widest">Point camera at package</span>
+          <button @click="showScanner = false" class="text-white hover:text-emerald-300 text-sm font-bold">✕ Close</button>
+        </div>
+        
+        <div class="flex justify-center w-full pb-2">
+          <div class="w-100 max-w-full rounded-2xl overflow-hidden relative aspect-square bg-black border-2 border-white/10 shadow-xl">
+            <qrcode-stream 
+              @detect="onDetect" 
+              @error="onCameraError"
+              :track="paintBoundingBox"
+            />
+        </div>
+        </div>
+        
+        <div v-if="cameraError" class="mt-3 p-2 bg-red-500/80 text-white text-xs rounded text-center">
+          {{ cameraError }}
+        </div>
+      </div>
+      <!--  -->
     </div>
 
     <div class="px-5 py-6 space-y-5">

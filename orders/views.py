@@ -163,7 +163,7 @@ class PalletViewSet(viewsets.ModelViewSet):
         }, status=200)
 
 # IoT simulasyonu gerceklestirilcek action tanimi yapilmaktadir.
-    @action(detail=True, methods=["post"], url_path="iot-data")
+    @action(detail=True, methods=["post"], url_path="iot-data", permission_classes=[IsAdminUser])
     def receive_iot_data(self, request, master_qr_id=None):
         pallet = self.get_object()
         

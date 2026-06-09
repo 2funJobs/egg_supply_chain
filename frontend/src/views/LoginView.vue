@@ -88,10 +88,9 @@ const handleLogin = async () => {
           <div>
             <div class="flex justify-between items-center mb-1.5 ml-1">
               <label class="block text-sm font-bold text-gray-700">Password</label>
-              <a href="#" class="text-xs font-semibold text-[#2D60C7] hover:text-blue-700">Forgot Password?</a>
             </div>
             <div class="relative">
-              <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+              <svg class="absolute left-3.5 top-1/3 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
               <input 
                 v-model="password"
                 type="password" 
@@ -99,6 +98,7 @@ const handleLogin = async () => {
                 required
                 class="w-full pl-11 pr-4 py-3.5 bg-gray-100 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors"
               />
+              <a href="#" class="m-2 text-xs font-semibold text-[#2D60C7] hover:text-blue-700">Şifremi Unuttum</a>
             </div>
           </div>
 
@@ -109,12 +109,12 @@ const handleLogin = async () => {
             class="w-full py-4 px-6 mt-4 rounded-2xl font-bold transition-all duration-200 flex items-center justify-center gap-3 text-lg"
             :class="isLoading 
               ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-              : 'bg-[#3A3F58] text-white hover:bg-[#2A2E42] shadow-lg shadow-[#3A3F58]/30'"
+              : 'bg-cyan-500 text-white hover:bg-cyan-700 shadow-lg shadow-[#3A3F58]/30 hover:cursor-pointer'"
           >
             <!-- Loading Spinner (v-if) -->
             <svg v-if="isLoading" class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
             
-            {{ isLoading ? 'Authenticating...' : 'Sign In' }}
+            {{ isLoading ? 'Authenticating...' : 'Giriş Yap' }}
           </button>
 
         </form>

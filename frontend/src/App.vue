@@ -2,6 +2,7 @@
      It shows the navigation sidebar (desktop) or bottom bar (mobile),
      and the current page is injected via <RouterView />. -->
 <script setup>
+import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { usePermissions } from './composables/usePermissions'
@@ -13,6 +14,16 @@ const { canViewPackages, canCreatePallet, canTransferPallet, canViewOrders, isMa
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+
+const targetRoute = computed(() => {
+  if (['PRODUCER', 'INSPECTOR'].includes(auth.user?.role)) {
+    return '/scan';
+  } else if (['DISTRIBUTOR', 'MARKET'].includes(auth.user?.role)) {
+    return '/transfer';
+  }
+  // Optional: A fallback route just in case the role is undefined
+  return '/'; 
+});
 
 // Helper: returns true when the current URL matches the given path.
 // Used to highlight the active nav item.
@@ -65,7 +76,7 @@ const handleLogout = () => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
         </svg>
-        <span class="text-[10px] md:text-sm font-semibold">Dashboard</span>
+        <span class="text-[10px] md:text-sm font-semibold">Ana Sayfa</span>
       </RouterLink>
 
       <RouterLink v-if="canCreatePallet || canTransferPallet"
@@ -80,7 +91,7 @@ const handleLogout = () => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
         </svg>
-        <span class="text-[10px] md:text-sm font-semibold">Pallets</span>
+        <span class="text-[10px] md:text-sm font-semibold">Paletler</span>
       </RouterLink>
 
       <RouterLink
@@ -112,7 +123,7 @@ const handleLogout = () => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
         </svg>
-        <span class="text-[10px] md:text-sm font-semibold">Packages</span>
+        <span class="text-[10px] md:text-sm font-semibold">Paketler</span>
       </RouterLink>
 
       <RouterLink
@@ -133,7 +144,7 @@ const handleLogout = () => {
       <!-- The QR Scan button floats up on mobile (classic mobile FAB pattern) -->
       <div class="relative flex flex-col items-center order-4 md:order-none">
         <RouterLink
-          to="/scan"
+          :to="targetRoute"
           class="relative -top-5 md:static md:mt-2 md:w-full
                  bg-amber-600 text-white p-10 md:py-3 md:px-4 rounded-full md:rounded-xl
                  shadow-lg flex items-center justify-center gap-2
@@ -146,7 +157,7 @@ const handleLogout = () => {
                  001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1
                  1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
           </svg>
-          <span class="hidden md:inline font-bold text-sm">Scan QR</span>
+          <span class="hidden md:inline font-bold text-sm">QR Okut</span>
         </RouterLink>
       </div>
       <!-- Profile — mobile nav only -->
@@ -162,7 +173,7 @@ const handleLogout = () => {
                     text-amber-700 font-black text-xs shrink-0">
           {{ auth.user?.orgName?.charAt(0) || 'U' }}
         </div>
-        <span class="text-[10px] font-semibold">Profile</span>
+        <span class="text-[10px] font-semibold">Profil</span>
       </RouterLink>
 
       <!-- User info + logout — desktop sidebar only -->
@@ -180,13 +191,13 @@ const handleLogout = () => {
         <button
           @click="handleLogout"
           class="flex items-center gap-3 w-full px-4 py-3 rounded-xl
-                 text-red-500 hover:bg-red-50 transition-colors"
+                 text-red-50 hover:text-red-50 transition-colors bg-red-500 hover:cursor-pointer hover:bg-red-700"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
           </svg>
-          <span class="text-sm font-semibold">Logout</span>
+          <span class="text-sm font-semibold">Çıkış</span>
         </button>
       </div>
     </nav>
